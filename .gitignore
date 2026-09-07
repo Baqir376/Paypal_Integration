@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Data and artefacts
+salix.db
+salix.db-wal
+salix.db-shm
+storage/
+*.log
+
+# Secrets
+.env
+.env.local
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Design vault ----------------------------------------------------------
+# The design ships in full: this is a graded submission, and the design is part
+# of what is being graded. `docs/PROTECTING-THE-FRONTEND.md` and
+# `web/scripts/design-vault.mjs` still document and implement the encryption,
+# and `npm run design:lock` still works -- it is simply not applied here.
+#
+# The key never ships. Nor do the encrypted blobs: `design-vault.mjs unlock`
+# leaves the author's files alone only when there is no .enc beside them, so a
+# repository carrying both would overwrite the real design with the neutral
+# stand-ins the first time anybody ran `npm run build`.
+web/.design-key
+web/**/*.enc
+web/design/fallbacks/
+
+# --- Not part of the submission --------------------------------------------
+# Personal recordings used while testing. These are somebody's actual voice and
+# have no business in a public repository.
+*.ogg
+*.opus
+WhatsApp*
+
+# Rendered screenshots. Ten megabytes of build output that anybody can
+# regenerate with `npm run shots`, and that nobody needs in order to run this.
+web/shots/
+
+# Database snapshots taken during development.
+salix.db.demo-backup
+*.db-backup

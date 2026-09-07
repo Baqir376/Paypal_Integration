@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 760" width="1180" height="760" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Salix system architecture</title>
+  <desc>Browser talks to FastAPI, which runs a six-agent analysis DAG over Alibaba Cloud Model Studio, persisting to a database with a vector index and object storage.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#86858e"/>
+    </marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7d9410"/>
+    </marker>
+    <style>
+      .t     { font-size: 13px; fill: #16161a; }
+      .tb    { font-size: 13.5px; fill: #16161a; font-weight: 600; }
+      .sm    { font-size: 11px; fill: #6b6b76; }
+      .mono  { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px; fill: #6b6b76; }
+      .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; fill: #9a9aa4; letter-spacing: 1.4px; }
+      .box   { fill: #fffefb; stroke: #e0dfd8; }
+      .agent { fill: #fffefb; stroke: #cfcec5; }
+      .det   { fill: #eef3d4; stroke: #7d9410; }
+      .cloud { fill: #e3e9ef; stroke: #4a6076; }
+      .line  { stroke: #cfcec5; stroke-width: 1.4; fill: none; marker-end: url(#arrow); }
+      .flow  { stroke: #7d9410; stroke-width: 1.6; fill: none; marker-end: url(#arrow-accent); }
+    </style>
+  </defs>
+
+  <rect width="1180" height="760" fill="#f7f6f3"/>
+
+  <!-- Title -->
+  <text x="40" y="46" font-size="27" font-family="Iowan Old Style, Georgia, serif" fill="#16161a">Salix</text>
+  <text x="103" y="46" class="sm" font-size="13">sales conversation intelligence on Alibaba Cloud Model Studio</text>
+
+  <!-- ============ BROWSER ============ -->
+  <rect x="40" y="76" width="330" height="112" rx="10" class="box"/>
+  <text x="58" y="99" class="eyebrow">BROWSER</text>
+  <text x="58" y="122" class="tb">Next.js 15 · React 19</text>
+  <text x="58" y="142" class="sm">Conversation Helix (three.js, SVG fallback)</text>
+  <text x="58" y="159" class="sm">Hand-built SVG charts · ⌘K semantic search</text>
+  <text x="58" y="177" class="mono">types generated from the Pydantic contract</text>
+
+  <!-- Browser -> API -->
+  <path class="line" d="M 205 188 L 205 226"/>
+  <text x="215" y="204" class="mono">REST · SSE ×2</text>
+
+  <!-- ============ API ============ -->
+  <rect x="40" y="226" width="330" height="86" rx="10" class="box"/>
+  <text x="58" y="249" class="eyebrow">API</text>
+  <text x="58" y="272" class="tb">FastAPI</text>
+  <text x="58" y="292" class="sm">25 endpoints · SSE pipeline stream · SSE dojo turn</text>
+
+  <!-- API -> DAG -->
+  <path class="flow" d="M 370 269 L 424 269"/>
+
+  <!-- ============ DAG ============ -->
+  <rect x="424" y="76" width="380" height="470" rx="10" fill="#fffefb" stroke="#cfcec5" stroke-dasharray="4 4"/>
+  <text x="444" y="102" class="eyebrow">ANALYSIS DAG · TYPED CONTRACT PER STAGE</text>
+
+  <!-- Transcriptionist -->
+  <rect x="452" y="118" width="324" height="58" rx="8" class="agent"/>
+  <text x="470" y="141" class="tb">Transcriptionist</text>
+  <text x="470" y="160" class="sm">Qwen ASR + diarization, then decides who is the rep</text>
+
+  <path class="flow" d="M 614 176 L 614 200"/>
+
+  <!-- Prosodist -->
+  <rect x="452" y="200" width="324" height="58" rx="8" class="det"/>
+  <text x="470" y="223" class="tb">Prosodist</text>
+  <text x="470" y="242" class="sm">No LLM. Arithmetic over millisecond timestamps.</text>
+  <text x="762" y="223" class="mono" text-anchor="end">deterministic</text>
+
+  <path class="flow" d="M 614 258 L 614 282"/>
+
+  <!-- Anatomist -->
+  <rect x="452" y="282" width="324" height="58" rx="8" class="agent"/>
+  <text x="470" y="305" class="tb">Anatomist</text>
+  <text x="470" y="324" class="sm">Stages, objections, MEDDIC — every claim cited</text>
+
+  <path class="flow" d="M 614 340 L 614 364"/>
+
+  <!-- Playwright -->
+  <rect x="452" y="364" width="324" height="58" rx="8" class="agent"/>
+  <text x="470" y="387" class="tb">Playwright</text>
+  <text x="470" y="406" class="sm">Extracts narrative plays · dedups · indexes moments</text>
+
+  <path class="flow" d="M 614 422 L 614 446"/>
+
+  <!-- Analyst -->
+  <rect x="452" y="446" width="324" height="58" rx="8" class="agent"/>
+  <text x="470" y="469" class="tb">Analyst</text>
+  <text x="470" y="488" class="sm">Deal trajectory · risk radar · cycle report</text>
+
+  <!-- ============ COACH (fed by retrieval) ============ -->
+  <rect x="856" y="364" width="286" height="86" rx="10" class="agent"/>
+  <text x="874" y="388" class="tb">Coach</text>
+  <text x="874" y="407" class="sm">Retrieves how colleagues who won</text>
+  <text x="874" y="424" class="sm">handled this rep's failures, then writes</text>
+  <text x="874" y="441" class="sm">a script grounded in those passages</text>
+
+  <!-- ============ MODEL STUDIO ============ -->
+  <rect x="856" y="76" width="286" height="250" rx="10" class="cloud"/>
+  <text x="874" y="100" class="eyebrow">ALIBABA CLOUD MODEL STUDIO</text>
+  <text x="874" y="126" class="mono">qwen-audio-3.0-asr-flash-filetrans</text>
+  <text x="874" y="142" class="sm">diarized file transcription</text>
+  <text x="874" y="172" class="mono">qwen3.8-max · qwen-plus</text>
+  <text x="874" y="188" class="sm">anatomy · plays · coaching · report</text>
+  <text x="874" y="218" class="mono">text-embedding-v4</text>
+  <text x="874" y="234" class="sm">moment index for retrieval</text>
+  <text x="874" y="264" class="mono">qwen3-tts-instruct-flash</text>
+  <text x="874" y="280" class="sm">Dojo buyer voice</text>
+  <text x="874" y="308" class="mono">fun-asr-realtime</text>
+
+  <!-- DAG -> Model Studio -->
+  <path class="line" d="M 780 147 L 852 147"/>
+  <path class="line" d="M 780 311 L 852 190"/>
+  <path class="line" d="M 780 393 L 852 220"/>
+  <path class="line" d="M 1000 326 L 1000 360"/>
+
+  <!-- ============ STORAGE ============ -->
+  <rect x="40" y="360" width="330" height="106" rx="10" class="box"/>
+  <text x="58" y="384" class="eyebrow">PERSISTENCE</text>
+  <text x="58" y="407" class="tb">SQLite  ·  ApsaraDB RDS PostgreSQL</text>
+  <text x="58" y="427" class="sm">Pydantic documents + promoted query columns</text>
+  <text x="58" y="447" class="sm">moments table = the vector index (numpy / pgvector)</text>
+
+  <rect x="40" y="486" width="330" height="80" rx="10" class="box"/>
+  <text x="58" y="510" class="eyebrow">OBJECT STORAGE</text>
+  <text x="58" y="533" class="tb">Local disk  ·  Alibaba Cloud OSS</text>
+  <text x="58" y="553" class="sm">Private bucket, time-limited signed URLs</text>
+
+  <path class="line" d="M 420 300 L 374 380"/>
+  <path class="line" d="M 420 480 L 374 510"/>
+  <path class="line" d="M 374 420 L 850 400" stroke-dasharray="4 3"/>
+  <text x="560" y="580" class="mono" text-anchor="middle">retrieval: filter in SQL, then cosine + MMR</text>
+
+  <!-- ============ GUARANTEES ============ -->
+  <rect x="40" y="606" width="1102" height="118" rx="10" fill="#fffefb" stroke="#e0dfd8"/>
+  <text x="58" y="630" class="eyebrow">THE THREE RULES</text>
+
+  <text x="58" y="658" class="tb">Measurement is arithmetic</text>
+  <text x="58" y="677" class="sm">Talk ratio, monologue, patience, pace — computed</text>
+  <text x="58" y="694" class="sm">in Python from timestamps, never inferred. Every</text>
+  <text x="58" y="711" class="sm">number is recomputable by hand from the transcript.</text>
+
+  <text x="428" y="658" class="tb">Nothing asserted without evidence</text>
+  <text x="428" y="677" class="sm">Findings must cite transcript segments. A fabricated</text>
+  <text x="428" y="694" class="sm">id is sent back with the legal ids; anything still</text>
+  <text x="428" y="711" class="sm">unresolvable is pruned rather than displayed.</text>
+
+  <text x="798" y="658" class="tb">Failure is per stage</text>
+  <text x="798" y="677" class="sm">Only transcription is fatal. A failed agent costs</text>
+  <text x="798" y="694" class="sm">its own output, never the page. Every provider has</text>
+  <text x="798" y="711" class="sm">a deterministic offline twin, so no key is required.</text>
+
+  <line x1="410" y1="640" x2="410" y2="712" stroke="#e0dfd8"/>
+  <line x1="780" y1="640" x2="780" y2="712" stroke="#e0dfd8"/>
+</svg>

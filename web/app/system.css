@@ -1,0 +1,1992 @@
+/* ============================================================================
+   SALIX — SYSTEM LAYER
+   ----------------------------------------------------------------------------
+   The art direction. Loaded last, so where it collides with the design system
+   in globals.css or the set pieces in effects.css, this wins — deliberately.
+
+   The provenance the whole look is built on:
+
+     Salix is the Latin genus of the willow. Willow bark yields salicin, which
+     became aspirin: the oldest instance in medicine of listening to a symptom
+     and treating the cause rather than the complaint. That is the product, and
+     it is the palette. Bark gold for provenance, electric willow for the live
+     signal, obsidian for the ground it is measured against.
+
+   Three colours carry every screen and nothing else is permitted:
+
+     --accent-signal   #D4F55A  electric willow  — the live, measured, now
+     --accent-gold     #C7A15C  bark gold        — provenance, seals, archive
+     --bg-primary      #08090A  obsidian basalt  — warm near-black, never blue
+
+   Structure follows the DormData benchmark: a fixed CRT telemetry rail, a
+   floating glassmorphic status pill, scroll-scrubbed word reveals, a
+   horizontally expanding chapter accordion, and pinned chapter slides.
+   ========================================================================= */
+
+/* --------------------------------------------------------------------------
+ * 1. TOKENS
+ * ----------------------------------------------------------------------- */
+
+:root {
+  /* --- Ground -------------------------------------------------------- */
+  --bg-primary: #08090a;
+  --bg-secondary: #0d0f10;
+  --bg-elevated: #121415;
+  --bg-sunken: #050506;
+
+  --text-primary: #f4f3ee;
+  --text-secondary: #a8a79f;
+  --text-tertiary: #6e6d68;
+  --text-quaternary: #46464a;
+
+  --line: rgb(244 243 238 / 0.09);
+  --line-strong: rgb(244 243 238 / 0.17);
+  --line-faint: rgb(244 243 238 / 0.045);
+
+  /* --- The three accents --------------------------------------------- */
+  --accent-signal: #d4f55a;
+  --accent-signal-dim: #98b32e;
+  --accent-signal-wash: rgb(212 245 90 / 0.09);
+
+  --accent-gold: #c7a15c;
+  --accent-gold-dim: #8d7038;
+  --accent-gold-wash: rgb(199 161 92 / 0.1);
+
+  /* Speaker duotone. Carried through from the product so a waveform on the
+     landing page means the same thing it means inside the console. */
+  --voice-rep: #6fd4cb;
+  --voice-buyer: #d9a5d3;
+
+  /* --- Easing -------------------------------------------------------- */
+  /* The spec curve. Symmetric, hard in and hard out — everything structural
+     (curtains, pins, accordion columns) rides this one. */
+  --ease-luxury: cubic-bezier(0.75, 0, 0.25, 1);
+  /* Fast pickup, long settle. Everything that *arrives* uses this. */
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  --dur-fast: 320ms;
+  --dur: 640ms;
+  --dur-slow: 1100ms;
+
+  /* --- Geometry ------------------------------------------------------ */
+  /* Grain plate. Generated rather than fetched: an <img> for noise is a
+     network round trip for something the renderer can make for free, and a
+     data URI cannot fail to load halfway down a dark page. */
+  /* Provenance. Survives minification, changes no pixels, and travels with a
+     wholesale copy -- which turns "that looks similar" into something that can
+     be demonstrated. See docs/PROTECTING-THE-FRONTEND.md. */
+  --sx-provenance: "salix/32287d1b7e23ebe1";
+
+  --sx-grain-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  --edge: clamp(18px, 4.4vw, 68px);
+  --rail-w: 34px;
+  --pill-h: 46px;
+  --measure-display: 16ch;
+
+  /* --- Imagery -------------------------------------------------------
+     Every art slot is a variable, so swapping the sourced Unsplash plates for
+     the local files in docs/ASSET-MANIFEST.md is one edit each and never a
+     hunt through markup. */
+  /* Every plate is graded in CSS -- desaturated, contrast lifted, brightness
+     dropped -- so one sourced photograph serves the whole palette and swapping
+     it never re-opens the grade. See docs/ASSET-MANIFEST.md for the download
+     table, the art direction for each slot, and the generation prompts. */
+  --img-hero: url("https://images.unsplash.com/photo-1478737270239-2f02b77fc618?q=80&w=2400&auto=format&fit=crop");
+
+  /* 01 Transcriptionist -- a broadcast microphone against black. */
+  --img-ch-01: url("https://images.unsplash.com/photo-1590602847861-f357a9332bbc?q=80&w=1800&auto=format&fit=crop");
+  /* 02 Prosodist -- a dense measurement grid on a screen. */
+  --img-ch-02: url("https://images.unsplash.com/photo-1518186285589-2f7649de83e0?q=80&w=1800&auto=format&fit=crop");
+  /* 03 Anatomist -- two people annotating a document by hand. */
+  --img-ch-03: url("https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=1800&auto=format&fit=crop");
+  /* 04 Playwright -- a move being made mid-conversation. */
+  --img-ch-04: url("https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1800&auto=format&fit=crop");
+  /* 05 Coach -- the desk a call is actually taken from. */
+  --img-ch-05: url("https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?q=80&w=1800&auto=format&fit=crop");
+  /* 06 Analyst -- the report at the end of the cycle. */
+  --img-ch-06: url("https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1800&auto=format&fit=crop");
+
+  /* A character stream, for the manifesto ground. */
+  --img-manifesto: url("https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=2000&auto=format&fit=crop");
+  /* A physical archive of portraits, for the provenance hero. */
+  --img-archive: url("https://images.unsplash.com/photo-1461360370896-922624d12aa1?q=80&w=2000&auto=format&fit=crop");
+}
+
+/* The art-directed routes are composed against black and do not invert. The
+   console honours the reader's theme; the marketing surfaces do not, because
+   the hero, the grain and the telemetry rail are a different design on paper
+   rather than the same one flipped. */
+.sx-dark {
+  color-scheme: dark;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+
+/* --------------------------------------------------------------------------
+ * 1b. THE SYSTEM LAYER IN LIGHT
+ *
+ * The chrome is shared with the console, and the console honours the reader's
+ * theme. So the tokens are remapped rather than the components being forked:
+ * one status pill, one rail, one diagnostics panel, two palettes.
+ *
+ * The art-directed routes are unaffected because they pin `data-theme="dark"`
+ * before first paint, which both of these selectors exclude.
+ * ----------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg-primary: #f7f6f3;
+    --bg-secondary: #fffefb;
+    --bg-elevated: #efeee9;
+    --bg-sunken: #e9e8e2;
+
+    --text-primary: #16161a;
+    --text-secondary: #3d3d45;
+    --text-tertiary: #6b6b76;
+    --text-quaternary: #9a9aa4;
+
+    --line: rgb(22 22 26 / 0.12);
+    --line-strong: rgb(22 22 26 / 0.2);
+    --line-faint: rgb(22 22 26 / 0.06);
+
+    --accent-signal: #7d9410;
+    --accent-signal-dim: #4f5d08;
+    --accent-signal-wash: rgb(125 148 16 / 0.1);
+
+    --accent-gold: #8d7038;
+    --accent-gold-dim: #b3945a;
+    --accent-gold-wash: rgb(141 112 56 / 0.1);
+
+    --voice-rep: #2f6f6b;
+    --voice-buyer: #8a5a86;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg-primary: #f7f6f3;
+  --bg-secondary: #fffefb;
+  --bg-elevated: #efeee9;
+  --bg-sunken: #e9e8e2;
+
+  --text-primary: #16161a;
+  --text-secondary: #3d3d45;
+  --text-tertiary: #6b6b76;
+  --text-quaternary: #9a9aa4;
+
+  --line: rgb(22 22 26 / 0.12);
+  --line-strong: rgb(22 22 26 / 0.2);
+  --line-faint: rgb(22 22 26 / 0.06);
+
+  --accent-signal: #7d9410;
+  --accent-signal-dim: #4f5d08;
+  --accent-signal-wash: rgb(125 148 16 / 0.1);
+
+  --accent-gold: #8d7038;
+  --accent-gold-dim: #b3945a;
+  --accent-gold-wash: rgb(141 112 56 / 0.1);
+
+  --voice-rep: #2f6f6b;
+  --voice-buyer: #8a5a86;
+}
+
+/* The glass and the grain are composed for a dark ground; on paper they read
+   as smudges rather than as depth. */
+:root[data-theme="light"] .sx-grain,
+:root[data-theme="light"] .sx-vignette { display: none; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .sx-grain,
+  :root:not([data-theme="dark"]) .sx-vignette { display: none; }
+}
+
+:root[data-theme="light"] .sx-pill,
+:root[data-theme="light"] .sx-rail {
+  background: rgb(255 254 251 / 0.78);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .sx-pill,
+  :root:not([data-theme="dark"]) .sx-rail {
+    background: rgb(255 254 251 / 0.78);
+  }
+}
+
+/* Difference blending against paper inverts the ring into a dark smear. */
+/* --------------------------------------------------------------------------
+ * 2. TYPE
+ * ----------------------------------------------------------------------- */
+
+.sx-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.sx-d0 { font-size: clamp(2.9rem, 8.4vw, 8.8rem); }
+.sx-d1 { font-size: clamp(2.9rem, 7.4vw, 6.6rem); }
+.sx-d2 { font-size: clamp(2.1rem, 4.4vw, 3.8rem); }
+.sx-d3 { font-size: clamp(1.5rem, 2.4vw, 2.15rem); line-height: 1; }
+
+.sx-italic { font-style: italic; }
+.sx-gold { color: var(--accent-gold); }
+.sx-signal { color: var(--accent-signal); }
+
+/* The monospaced technical tag. Every piece of metadata in the product wears
+   this — model ids, latencies, segment counts, the bracket labels on sections.
+   It is the typographic tell that the numbers are real. */
+.sx-tag {
+  font-family: var(--font-mono);
+  font-size: clamp(9.5px, 0.72vw, 11px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sx-tag-signal { color: var(--accent-signal); }
+.sx-tag-gold { color: var(--accent-gold); }
+
+/* A tag long enough to be a sentence -- an emits line, a service surface --
+   has to be allowed to break. `nowrap` is right for a two-word readout and
+   wrong for everything else, so it is opt-out rather than universal. */
+.sx-tag-wrap { white-space: normal; line-height: 1.85; }
+
+.sx-lede {
+  font-size: clamp(1rem, 1.15vw, 1.22rem);
+  line-height: 1.62;
+  color: var(--text-secondary);
+  max-width: 58ch;
+  text-wrap: pretty;
+  margin: 0;
+}
+
+.sx-body {
+  font-size: 14.5px;
+  line-height: 1.72;
+  color: var(--text-secondary);
+  max-width: 66ch;
+}
+.sx-body p + p { margin-top: 1.05em; }
+
+.sx-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+/* --------------------------------------------------------------------------
+ * 3. WORD REVEAL — scrubbed by scroll
+ *
+ * The mask is a clipped box the height of the line; the word rides up out of
+ * it. Split on words, never characters: a per-character stagger at display
+ * size reads as a slot machine, words rising out of a mask read as typesetting.
+ * ----------------------------------------------------------------------- */
+
+.reveal-line {
+  display: block;
+  overflow: hidden;
+  /* A descender clipped by an exact line box looks like a rendering fault. */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.reveal-word {
+  display: inline-block;
+  will-change: transform, opacity;
+  transform: translateY(108%) rotate(2.4deg);
+  opacity: 0;
+}
+
+.reveal-word.is-in {
+  transform: none;
+  opacity: 1;
+  transition:
+    transform var(--dur-slow) var(--ease-expo),
+    opacity 800ms var(--ease-expo);
+}
+
+/* Word-by-word fade for body copy — no lift, only tone. A paragraph that
+   jumps is a paragraph you cannot read while it moves. */
+.fade-word {
+  opacity: 0.14;
+  transition: opacity 520ms var(--ease-out-quart);
+}
+.fade-word.is-in { opacity: 1; }
+
+/* --------------------------------------------------------------------------
+ * 4. CRT TELEMETRY RAIL
+ *
+ * Fixed to the left edge, rotated into the vertical. Alternating bit stream
+ * and wordmark, on a phosphor-green scanline that never quite settles.
+ * ----------------------------------------------------------------------- */
+
+.sx-rail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--rail-w);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  border-right: 1px solid var(--line-faint);
+  background: linear-gradient(
+    180deg,
+    rgb(8 9 10 / 0.86) 0%,
+    rgb(8 9 10 / 0.4) 42%,
+    rgb(8 9 10 / 0.86) 100%
+  );
+  backdrop-filter: blur(3px);
+}
+
+.sx-rail-stream {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.42em;
+  color: var(--accent-signal);
+  opacity: 0.62;
+  text-shadow: 0 0 7px rgb(212 245 90 / 0.5);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  animation: sx-crt-flicker 4.6s steps(24) infinite;
+}
+
+@keyframes sx-crt-flicker {
+  0%, 92%, 100% { opacity: 0.62; }
+  93% { opacity: 0.28; }
+  95% { opacity: 0.7; }
+  97% { opacity: 0.4; }
+}
+
+/* The scanline that crawls the rail. Pure decoration; it is what makes the
+   rail read as a readout rather than as a sidebar. */
+.sx-rail::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 84px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgb(212 245 90 / 0.075),
+    transparent
+  );
+  animation: sx-scan 7.5s linear infinite;
+}
+
+@keyframes sx-scan {
+  from { transform: translateY(-90px); }
+  to { transform: translateY(100vh); }
+}
+
+/* The corner marks at the rail head and foot. */
+.sx-rail-cap {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--accent-signal);
+  opacity: 0.5;
+}
+.sx-rail-cap-top { top: 14px; }
+.sx-rail-cap-bottom { bottom: 14px; }
+
+/* --------------------------------------------------------------------------
+ * 5. FLOATING GLASSMORPHIC STATUS PILL
+ *
+ * Top-centre, persistent across every route. Left half reads the section the
+ * reader is currently inside; right half is the navigation.
+ * ----------------------------------------------------------------------- */
+
+.sx-pill {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 70;
+  display: flex;
+  align-items: stretch;
+  height: var(--pill-h);
+  translate: -50% 0;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgb(13 15 16 / 0.72);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  box-shadow:
+    0 18px 44px -22px rgb(0 0 0 / 0.9),
+    inset 0 1px 0 rgb(244 243 238 / 0.07);
+  max-width: calc(100vw - var(--rail-w) - 24px);
+  transition:
+    translate var(--dur) var(--ease-luxury),
+    opacity var(--dur) var(--ease-luxury);
+}
+
+/* Retreats out of the way while the reader is moving down the page, returns
+   the instant they scroll back. A nav that is always there is furniture; a nav
+   that arrives when you reach for it is an interface. */
+.sx-pill.is-hidden {
+  translate: -50% -140%;
+  opacity: 0;
+}
+
+.sx-pill-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px 0 18px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.sx-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-signal);
+  box-shadow: 0 0 0 0 rgb(212 245 90 / 0.5);
+  animation: sx-pulse 2.1s ease-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes sx-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(212 245 90 / 0.45); }
+  70% { box-shadow: 0 0 0 8px rgb(212 245 90 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(212 245 90 / 0); }
+}
+
+/* The readout swaps by rolling, not by re-rendering: the old label leaves
+   upward as the new one arrives from below, inside a fixed-height mask. */
+.sx-pill-readout {
+  position: relative;
+  overflow: hidden;
+  height: 13px;
+  min-width: 148px;
+}
+/* Keyframes rather than transitions: both spans are mounted fresh by React on
+   every change, and an element that appears already in its end state has
+   nothing to transition from. An animation plays on mount; a transition does
+   not. */
+.sx-pill-readout > span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+}
+.sx-pill-readout > .is-in { animation: sx-roll-in 520ms var(--ease-luxury) both; }
+.sx-pill-readout > .is-out { animation: sx-roll-out 520ms var(--ease-luxury) both; }
+
+@keyframes sx-roll-in {
+  from { transform: translateY(105%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes sx-roll-out {
+  from { transform: none; opacity: 1; }
+  to { transform: translateY(-105%); opacity: 0; }
+}
+
+.sx-pill-nav {
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  gap: 1px;
+}
+
+.sx-pill-link {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 460;
+  color: var(--text-secondary);
+  overflow: hidden;
+  transition: color 260ms var(--ease-expo), background 260ms var(--ease-expo);
+}
+.sx-pill-link:hover { color: var(--text-primary); background: rgb(244 243 238 / 0.06); }
+.sx-pill-link[data-active="true"] {
+  color: var(--bg-primary);
+  background: var(--accent-signal);
+  font-weight: 560;
+}
+
+.sx-pill-cta {
+  display: grid;
+  place-items: center;
+  height: 32px;
+  margin: 0 6px 0 4px;
+  padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  font-size: 12.5px;
+  font-weight: 520;
+  overflow: hidden;
+  transition: background 300ms var(--ease-expo), color 300ms var(--ease-expo);
+}
+.sx-pill-cta:hover { background: var(--accent-gold); color: var(--bg-primary); }
+
+/* --------------------------------------------------------------------------
+ * 6. DUAL-LAYER ROLLING TEXT
+ *
+ * Two stacked copies of the same string in a fixed mask. On hover the pair
+ * slides one line height: the resting copy leaves the top, the duplicate
+ * arrives from the bottom. The label never fades, so it stays readable
+ * throughout the transition.
+ * ----------------------------------------------------------------------- */
+
+.roll {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.roll > span {
+  grid-area: 1 / 1;
+  display: block;
+  transition: transform 560ms var(--ease-luxury);
+}
+.roll > span:last-child { transform: translateY(105%); }
+
+.roll-host:hover .roll > span:first-child,
+.roll:hover > span:first-child { transform: translateY(-105%); }
+.roll-host:hover .roll > span:last-child,
+.roll:hover > span:last-child { transform: none; }
+
+/* --------------------------------------------------------------------------
+ * 7. BUTTONS
+ * ----------------------------------------------------------------------- */
+
+.sx-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 26px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  overflow: hidden;
+  background: transparent;
+  isolation: isolate;
+  transition: color 420ms var(--ease-luxury), border-color 420ms var(--ease-luxury);
+}
+
+/* The fill wipes up from the bottom edge rather than fading in — a fade reads
+   as a state change, a wipe reads as a mechanism. */
+.sx-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--accent-signal);
+  transform: translateY(101%);
+  transition: transform 560ms var(--ease-luxury);
+}
+.sx-btn:hover { color: var(--bg-primary); border-color: var(--accent-signal); }
+.sx-btn:hover::before { transform: none; }
+
+.sx-btn-solid {
+  background: var(--accent-signal);
+  border-color: var(--accent-signal);
+  color: var(--bg-primary);
+  font-weight: 580;
+}
+.sx-btn-solid::before { background: var(--text-primary); }
+.sx-btn-solid:hover { color: var(--bg-primary); border-color: var(--text-primary); }
+
+.sx-btn-gold { border-color: var(--accent-gold-dim); color: var(--accent-gold); }
+.sx-btn-gold::before { background: var(--accent-gold); }
+.sx-btn-gold:hover { color: var(--bg-primary); border-color: var(--accent-gold); }
+
+.sx-btn-sm { height: 40px; padding: 0 19px; font-size: 12.5px; gap: 9px; }
+
+/* --------------------------------------------------------------------------
+ * 8. THE CURSOR
+ *
+ * One ring, no system arrow. The `cursor: none` is gated behind a class the
+ * component adds to <html> only once it has mounted and decided it will
+ * actually run -- so a JavaScript failure, a touchscreen or reduced motion all
+ * leave the ordinary pointer exactly where it was. A page with no pointer and
+ * no replacement is unusable, and that must never be one bad deploy away.
+ * ----------------------------------------------------------------------- */
+
+.sx-has-cursor,
+.sx-has-cursor * {
+  cursor: none !important;
+}
+
+.sx-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 1px solid rgb(244 243 238 / 0.8);
+  border-radius: 999px;
+  pointer-events: none;
+  mix-blend-mode: difference;
+  will-change: transform;
+  transition:
+    opacity 260ms linear,
+    width 420ms var(--ease-expo),
+    height 420ms var(--ease-expo),
+    margin 420ms var(--ease-expo),
+    background 420ms var(--ease-expo),
+    border-color 420ms var(--ease-expo);
+}
+
+/* Over something clickable: opens up and fills faintly. */
+.sx-cursor[data-state="link"] {
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  background: rgb(244 243 238 / 0.14);
+}
+
+/* Over a card: wider still, so the ring reads as framing the thing. */
+.sx-cursor[data-state="card"] {
+  width: 86px;
+  height: 86px;
+  margin: -43px 0 0 -43px;
+  border-color: rgb(244 243 238 / 0.45);
+  background: rgb(244 243 238 / 0.08);
+}
+
+/* Over text: collapses to a caret, which is the one place the ring would be
+   worse than what it replaced. */
+.sx-cursor[data-state="text"] {
+  width: 2px;
+  height: 26px;
+  margin: -13px 0 0 -1px;
+  border-radius: 1px;
+  background: rgb(244 243 238 / 0.85);
+}
+
+/* Difference blending against paper turns the ring into a dark smear, so the
+   light console gets its own treatment. */
+:root[data-theme="light"] .sx-cursor {
+  mix-blend-mode: normal;
+  border-color: rgb(22 22 26 / 0.45);
+}
+:root[data-theme="light"] .sx-cursor[data-state="link"] { background: rgb(22 22 26 / 0.07); }
+:root[data-theme="light"] .sx-cursor[data-state="card"] { background: rgb(22 22 26 / 0.05); }
+:root[data-theme="light"] .sx-cursor[data-state="text"] { background: rgb(22 22 26 / 0.8); }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .sx-cursor {
+    mix-blend-mode: normal;
+    border-color: rgb(22 22 26 / 0.45);
+  }
+  :root:not([data-theme="dark"]) .sx-cursor[data-state="link"] { background: rgb(22 22 26 / 0.07); }
+  :root:not([data-theme="dark"]) .sx-cursor[data-state="card"] { background: rgb(22 22 26 / 0.05); }
+  :root:not([data-theme="dark"]) .sx-cursor[data-state="text"] { background: rgb(22 22 26 / 0.8); }
+}
+
+/* No cursor to augment, and no arrow to take away. */
+@media (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .sx-cursor { display: none; }
+  .sx-has-cursor, .sx-has-cursor * { cursor: auto !important; }
+}
+
+/* --------------------------------------------------------------------------
+ * 9. FILM GRAIN
+ *
+ * The cheapest large gain in perceived quality there is: it breaks the banding
+ * in every gradient and gives flat panels a surface. 0.035 — visible as
+ * texture, invisible as noise.
+ * ----------------------------------------------------------------------- */
+
+.sx-grain {
+  position: fixed;
+  inset: -60px;
+  z-index: 9000;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: var(--sx-grain-src);
+  background-size: 200px 200px;
+  animation: sx-grain-drift 620ms steps(4) infinite;
+}
+
+@keyframes sx-grain-drift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-14px, 9px); }
+  50% { transform: translate(11px, -12px); }
+  75% { transform: translate(-9px, -7px); }
+  100% { transform: translate(0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sx-grain { animation: none; }
+}
+
+/* Exactly one grain plate on the page. The atmosphere layer carries its own,
+   underneath the content, and two grains at different opacities and blend
+   modes read as dirt rather than as film. The washes and the blueprint grid
+   it also draws are kept — those are doing a different job. */
+.atmosphere-grain { display: none !important; }
+
+/* Vignette. Sits under the grain and above everything else, and is what keeps
+   the eye at the centre of a very wide hero. */
+.sx-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 8999;
+  pointer-events: none;
+  background: radial-gradient(
+    115% 92% at 50% 42%,
+    transparent 42%,
+    rgb(5 5 6 / 0.42) 100%
+  );
+}
+
+/* --------------------------------------------------------------------------
+ * 10. PAGE FRAME
+ * ----------------------------------------------------------------------- */
+
+.sx-page { padding-left: var(--rail-w); }
+
+.sx-section {
+  position: relative;
+  padding: clamp(84px, 12vh, 160px) var(--edge);
+}
+
+.sx-section-line { border-top: 1px solid var(--line); }
+
+/* The bracket tag that labels a section, pinned to the left column while its
+   statement scrolls past on the right. */
+.sx-bracket {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.sx-bracket::before { content: "["; color: var(--accent-gold); }
+.sx-bracket::after { content: "]"; color: var(--accent-gold); }
+
+.sx-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 232px) minmax(0, 1fr);
+  gap: clamp(28px, 6vw, 96px);
+  align-items: start;
+}
+
+.sx-sticky {
+  position: sticky;
+  top: calc(var(--pill-h) + 44px);
+}
+
+/* A 232px label column beside a paragraph is a 232px label column beside a
+   sliver. Below 820px the bracket tag becomes a heading over its section, and
+   the sticky rail stops sticking -- there is nothing left beside it to stay
+   level with. */
+@media (max-width: 820px) {
+  .sx-two-col { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .sx-sticky { position: static; }
+}
+
+/* --------------------------------------------------------------------------
+ * 11. HERO
+ * ----------------------------------------------------------------------- */
+
+.sx-hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 var(--edge) clamp(34px, 6vh, 62px);
+  overflow: hidden;
+}
+
+.sx-hero-plate {
+  position: absolute;
+  inset: -8% 0 0;
+  background-image: var(--img-hero);
+  background-size: cover;
+  background-position: 50% 42%;
+  /* Colour-graded in CSS rather than in the file, so one sourced plate serves
+     the whole palette and swapping it never re-opens the grade. */
+  filter: grayscale(1) contrast(1.2) brightness(0.62);
+  will-change: transform;
+  z-index: -2;
+}
+
+.sx-hero-plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(8 9 10 / 0.66) 0%, rgb(8 9 10 / 0.26) 38%, var(--bg-primary) 97%),
+    linear-gradient(92deg, rgb(8 9 10 / 0.88) 0%, rgb(8 9 10 / 0.5) 42%, transparent 72%);
+}
+
+.sx-hero-head {
+  position: relative;
+  z-index: 1;
+  max-width: min(1180px, 80vw);
+}
+
+.sx-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  align-items: center;
+  padding-top: 26px;
+  margin-top: 30px;
+  border-top: 1px solid var(--line);
+}
+
+.sx-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+/* The scroll hint. A hairline that fills top-to-bottom on a loop. */
+.sx-scroll-hint {
+  position: absolute;
+  right: var(--edge);
+  bottom: clamp(34px, 6vh, 62px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 1;
+}
+.sx-scroll-hint-track {
+  position: relative;
+  width: 1px;
+  height: 62px;
+  background: var(--line-strong);
+  overflow: hidden;
+}
+.sx-scroll-hint-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent-signal);
+  transform-origin: top;
+  animation: sx-hint 2.4s var(--ease-luxury) infinite;
+}
+@keyframes sx-hint {
+  0% { transform: scaleY(0); transform-origin: top; }
+  45% { transform: scaleY(1); transform-origin: top; }
+  55% { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
+}
+
+/* The atmosphere's washes are wider than the viewport by design -- they are a
+   light source, not a layer -- so the container clips them. Without this they
+   extend the document's scroll width on a narrow screen. */
+.atmosphere { overflow: hidden; }
+
+/* The manifesto ground. Held at 6% and masked to the top-right corner, so it
+   is a texture the eye finds rather than a background it has to read through. */
+.sx-manifesto-plate {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--img-manifesto);
+  background-size: cover;
+  background-position: 70% 30%;
+  filter: grayscale(1) contrast(1.5) brightness(0.5);
+  opacity: 0.06;
+  mask-image: radial-gradient(70% 60% at 84% 18%, #000 0%, transparent 74%);
+  -webkit-mask-image: radial-gradient(70% 60% at 84% 18%, #000 0%, transparent 74%);
+}
+
+/* --------------------------------------------------------------------------
+ * 12. METRIC CARDS
+ * ----------------------------------------------------------------------- */
+
+.sx-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.sx-metric {
+  position: relative;
+  background: var(--bg-primary);
+  padding: 22px 20px 20px;
+  overflow: hidden;
+  transition: background 480ms var(--ease-luxury);
+}
+.sx-metric:hover { background: var(--bg-elevated); }
+
+/* A hairline that draws across the top of the card on hover, left to right. */
+.sx-metric::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--accent-signal);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 620ms var(--ease-luxury);
+}
+.sx-metric:hover::after { transform: none; }
+
+.sx-metric-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.6rem, 2.9vw, 2.45rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.sx-metric-label {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  max-width: 24ch;
+}
+
+/* --------------------------------------------------------------------------
+ * 13. CHAPTER RUNS — the horizontal expanding accordion
+ *
+ * Four columns at flex: 1. The one under the pointer goes to flex: 3.5 and
+ * its full-bleed plate and spec table become readable; the rest compress to
+ * their numeric spine and vertical title. Keyboard focus does exactly what
+ * hover does, so the content is not behind a pointer.
+ * ----------------------------------------------------------------------- */
+
+.svc-cols {
+  display: flex;
+  gap: 1px;
+  background: var(--line);
+  border-block: 1px solid var(--line);
+  min-height: 72svh;
+  overflow: hidden;
+}
+
+.svc-col {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-primary);
+  cursor: pointer;
+  overflow: hidden;
+  transition: flex var(--dur-slow) var(--ease-luxury);
+}
+
+.svc-col[data-open="true"] { flex: 3.5; }
+
+.svc-col-plate {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(1) contrast(1.18) brightness(0.34);
+  opacity: 0;
+  scale: 1.12;
+  transition:
+    opacity var(--dur-slow) var(--ease-luxury),
+    scale 1800ms var(--ease-luxury);
+}
+.svc-col[data-open="true"] .svc-col-plate { opacity: 1; scale: 1; }
+
+.svc-col-plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgb(8 9 10 / 0.5) 0%,
+    rgb(8 9 10 / 0.78) 62%,
+    rgb(8 9 10 / 0.95) 100%
+  );
+}
+
+.svc-col-inner {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 22px;
+}
+
+.svc-col-index {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--accent-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The spine: the title set vertically while the column is closed. Taken out
+   of flow so it and the open body are not both trying to claim the bottom of
+   the column with `margin-top: auto`. */
+.svc-col-spine {
+  position: absolute;
+  left: 22px;
+  bottom: 26px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 1.8vw, 1.7rem);
+  letter-spacing: -0.02em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition:
+    opacity 460ms var(--ease-luxury),
+    color 460ms var(--ease-luxury),
+    visibility 0s linear 460ms;
+}
+.svc-col:hover .svc-col-spine { color: var(--text-primary); }
+/* Hidden rather than transparent once open, so it leaves the tab order
+   instead of sitting invisibly in it. */
+.svc-col[data-open="true"] .svc-col-spine {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.svc-col-body {
+  margin-top: auto;
+  opacity: 0;
+  translate: 0 22px;
+  pointer-events: none;
+  transition:
+    opacity 620ms var(--ease-luxury) 180ms,
+    translate 760ms var(--ease-luxury) 180ms;
+}
+.svc-col[data-open="true"] .svc-col-body {
+  opacity: 1;
+  translate: none;
+  pointer-events: auto;
+}
+
+.svc-col-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 2.6vw, 2.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+}
+
+.svc-col-copy {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  max-width: 46ch;
+  margin: 0 0 20px;
+}
+
+/* The spec table inside an open column. Two columns, hairline separated,
+   monospaced values — the same table that appears on a call detail page. */
+.svc-spec {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  max-width: 460px;
+}
+.svc-spec-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: baseline;
+  padding: 9px 13px;
+  background: rgb(8 9 10 / 0.72);
+  font-size: 12px;
+}
+.svc-spec-row dt { color: var(--text-tertiary); margin: 0; }
+.svc-spec-row dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  /* A four-column accordion on a phone is four slivers. Below 900px it
+     becomes a stack, every panel open, which is the same content without the
+     gesture. */
+  .svc-cols { flex-direction: column; min-height: 0; }
+  .svc-col, .svc-col[data-open="true"] { flex: none; min-height: 320px; }
+  .svc-col-plate { opacity: 1; scale: 1; }
+  .svc-col-spine { display: none; }
+  .svc-col-body { opacity: 1; translate: none; pointer-events: auto; }
+}
+
+/* --------------------------------------------------------------------------
+ * 14. PINNED CHAPTER SLIDES
+ *
+ * A track as tall as its slide count; the viewport-height stage inside it is
+ * pinned by ScrollTrigger while the slides cross-fade and their plates drift.
+ * ----------------------------------------------------------------------- */
+
+.sx-pin-track { position: relative; }
+
+.sx-pin-stage {
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.sx-slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 5vw, 80px);
+  padding: 0 var(--edge);
+  opacity: 0;
+  pointer-events: none;
+}
+.sx-slide[data-active="true"] { opacity: 1; pointer-events: auto; }
+
+.sx-slide-plate {
+  position: absolute;
+  inset: -12% -6%;
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(1) contrast(1.2) brightness(0.3);
+  z-index: -1;
+  will-change: transform;
+}
+.sx-slide-plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(97deg, var(--bg-primary) 8%, rgb(8 9 10 / 0.66) 58%, rgb(8 9 10 / 0.3) 100%);
+}
+
+.sx-slide-bullets { list-style: none; margin: 22px 0 0; padding: 0; }
+.sx-slide-bullets li {
+  position: relative;
+  padding: 11px 0 11px 26px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.sx-slide-bullets li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 20px;
+  width: 8px;
+  height: 1px;
+  background: var(--accent-signal);
+}
+
+/* The chapter counter, bottom-left of the pinned stage. */
+.sx-pin-counter {
+  position: absolute;
+  left: var(--edge);
+  bottom: 34px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.sx-pin-counter-now { font-size: 30px; color: var(--accent-signal); letter-spacing: -0.04em; }
+.sx-pin-counter-all { font-size: 12px; color: var(--text-quaternary); }
+
+.sx-pin-bar {
+  position: absolute;
+  left: var(--edge);
+  right: var(--edge);
+  bottom: 22px;
+  height: 1px;
+  background: var(--line);
+}
+.sx-pin-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent-signal);
+  transform-origin: left;
+  transition: scale 520ms var(--ease-luxury);
+}
+
+@media (max-width: 860px) {
+  .sx-slide { grid-template-columns: minmax(0, 1fr); align-content: center; }
+  /* The bullets are the substance of the slide, not an aside: they stay and
+     the second column simply stacks under the first. */
+  .sx-slide-bullets { margin-top: 18px; }
+  .sx-slide-bullets li { font-size: 12.5px; padding: 9px 0 9px 22px; }
+  .sx-pin-counter { bottom: 26px; }
+}
+
+/* --------------------------------------------------------------------------
+ * 15. NEURAL VOICE ORB
+ *
+ * The centrepiece of the console. Three counter-rotating rings around a core
+ * whose scale is driven from live input amplitude via --orb-amp, so it is a
+ * meter rather than an ornament.
+ * ----------------------------------------------------------------------- */
+
+.sx-orb {
+  --orb-amp: 0;
+  position: relative;
+  width: clamp(180px, 24vw, 262px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.sx-orb-core {
+  position: absolute;
+  inset: 26%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 30%, rgb(212 245 90 / 0.92), rgb(152 179 46 / 0.5) 44%, rgb(8 9 10 / 0.9) 78%);
+  box-shadow:
+    0 0 calc(38px + var(--orb-amp) * 70px) rgb(212 245 90 / calc(0.22 + var(--orb-amp) * 0.42)),
+    inset 0 0 30px rgb(8 9 10 / 0.7);
+  scale: calc(1 + var(--orb-amp) * 0.18);
+  transition: scale 90ms linear, box-shadow 140ms linear;
+}
+
+/* The breathing pulse when idle. Stops the orb reading as a static graphic
+   while the engine is genuinely waiting. */
+.sx-orb[data-state="idle"] .sx-orb-core { animation: sx-breathe 4.2s ease-in-out infinite; }
+@keyframes sx-breathe {
+  0%, 100% { scale: 1; opacity: 0.72; }
+  50% { scale: 1.05; opacity: 1; }
+}
+
+.sx-orb[data-state="listening"] .sx-orb-core {
+  background:
+    radial-gradient(circle at 34% 30%, rgb(111 212 203 / 0.95), rgb(47 111 107 / 0.5) 44%, rgb(8 9 10 / 0.9) 78%);
+  box-shadow:
+    0 0 calc(38px + var(--orb-amp) * 80px) rgb(111 212 203 / calc(0.24 + var(--orb-amp) * 0.46)),
+    inset 0 0 30px rgb(8 9 10 / 0.7);
+}
+
+.sx-orb[data-state="speaking"] .sx-orb-core {
+  background:
+    radial-gradient(circle at 34% 30%, rgb(217 165 211 / 0.95), rgb(138 90 134 / 0.5) 44%, rgb(8 9 10 / 0.9) 78%);
+  box-shadow:
+    0 0 46px rgb(217 165 211 / 0.34),
+    inset 0 0 30px rgb(8 9 10 / 0.7);
+}
+
+.sx-orb-ring {
+  position: absolute;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+}
+.sx-orb-ring-1 { inset: 0; animation: sx-spin 24s linear infinite; border-style: dashed; }
+.sx-orb-ring-2 { inset: 11%; animation: sx-spin 17s linear infinite reverse; border-color: rgb(212 245 90 / 0.24); }
+.sx-orb-ring-3 { inset: 19%; animation: sx-spin 33s linear infinite; border-color: rgb(199 161 92 / 0.22); }
+
+@keyframes sx-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The tick marks around the orb — a dial, so amplitude has a scale to be read
+   against instead of floating free. */
+.sx-orb-ticks { position: absolute; inset: -6%; opacity: 0.42; }
+
+/* --------------------------------------------------------------------------
+ * 16. WAVEFORM VISUALISER
+ * ----------------------------------------------------------------------- */
+
+.sx-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 54px;
+  width: 100%;
+}
+
+.sx-wave-bar {
+  flex: 1;
+  min-width: 2px;
+  max-width: 4px;
+  border-radius: 999px;
+  background: var(--accent-signal-dim);
+  transform-origin: center;
+  scale: 1 var(--h, 0.06);
+  height: 100%;
+  transition: scale 90ms linear, background 260ms linear;
+}
+.sx-wave[data-live="true"] .sx-wave-bar { background: var(--accent-signal); }
+.sx-wave[data-voice="buyer"] .sx-wave-bar { background: var(--voice-buyer); }
+
+/* --------------------------------------------------------------------------
+ * 17. DIAGNOSTICS PANEL
+ * ----------------------------------------------------------------------- */
+
+.sx-diag {
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--bg-sunken) 72%, transparent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sx-diag-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--line);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  font-size: 9.5px;
+}
+
+.sx-diag-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 13px;
+  border-bottom: 1px solid var(--line-faint);
+  color: var(--text-tertiary);
+}
+.sx-diag-row:last-child { border-bottom: none; }
+.sx-diag-row > b {
+  font-weight: 400;
+  color: var(--accent-signal);
+  letter-spacing: -0.02em;
+}
+.sx-diag-row[data-tone="gold"] > b { color: var(--accent-gold); }
+.sx-diag-row[data-tone="muted"] > b { color: var(--text-secondary); }
+
+/* The typewriter caret on the live transcription line. */
+.sx-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.16em;
+  background: var(--accent-signal);
+  animation: sx-blink 1s steps(2, start) infinite;
+}
+@keyframes sx-blink {
+  50% { opacity: 0; }
+}
+
+/* --------------------------------------------------------------------------
+ * 18. ROTATING SEAL
+ *
+ * An SVG textPath on an infinite loop. Used once per page at most — it is a
+ * maker's mark, and a second one would make it decoration.
+ * ----------------------------------------------------------------------- */
+
+.sx-seal { animation: sx-spin 26s linear infinite; }
+.sx-seal text {
+  font-family: var(--font-mono);
+  font-size: 9.4px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  fill: var(--accent-gold);
+}
+
+/* --------------------------------------------------------------------------
+ * 19. TIMELINE / ARCHIVE
+ * ----------------------------------------------------------------------- */
+
+.sx-timeline { position: relative; padding-left: 30px; }
+.sx-timeline::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--line);
+}
+/* The progress fill is driven from --progress by the scroll driver, so the
+   spine draws itself as the reader descends. */
+.sx-timeline::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  width: 1px;
+  height: calc((100% - 12px) * var(--progress, 0));
+  background: linear-gradient(180deg, var(--accent-signal), var(--accent-gold));
+}
+
+.sx-tl-item { position: relative; padding: 0 0 42px; }
+.sx-tl-item::before {
+  content: "";
+  position: absolute;
+  left: -30px;
+  top: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-primary);
+  transition: background 420ms var(--ease-luxury), border-color 420ms var(--ease-luxury);
+}
+.sx-tl-item:hover::before { background: var(--accent-signal); border-color: var(--accent-signal); }
+
+/* --------------------------------------------------------------------------
+ * 19b. HORIZONTAL CHAPTER RUN
+ * ----------------------------------------------------------------------- */
+
+.sx-run { position: relative; overflow: hidden; }
+
+.sx-run-track {
+  display: flex;
+  gap: 1px;
+  width: max-content;
+  background: var(--line);
+  border-block: 1px solid var(--line);
+}
+
+.sx-run-card {
+  flex: 0 0 clamp(272px, 32vw, 412px);
+  background: var(--bg-primary);
+  padding: 34px 28px 30px;
+  display: flex;
+  flex-direction: column;
+  min-height: 46svh;
+  transition: background 520ms var(--ease-luxury);
+}
+.sx-run-card:hover { background: var(--bg-elevated); }
+
+/* Where the pin does not run, the track is dragged instead of scrubbed. A
+   hidden overflow with no tween would simply amputate the last cards. */
+@media (max-width: 899px), (prefers-reduced-motion: reduce) {
+  .sx-run { overflow-x: auto; overscroll-behavior-x: contain; }
+  .sx-run::-webkit-scrollbar { height: 2px; }
+  .sx-run::-webkit-scrollbar-thumb { background: var(--line-strong); }
+}
+
+/* --------------------------------------------------------------------------
+ * 20. DATA TABLE — archive / spec variant
+ * ----------------------------------------------------------------------- */
+
+.sx-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.sx-table th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-quaternary);
+  font-weight: 400;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.sx-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line-faint);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+.sx-table tbody tr { transition: background 320ms var(--ease-luxury); }
+.sx-table tbody tr:hover { background: rgb(244 243 238 / 0.028); }
+.sx-table .sx-td-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* --------------------------------------------------------------------------
+ * 21. PARAMETER SLIDER — detail page
+ * ----------------------------------------------------------------------- */
+
+.sx-param { padding: 15px 0; border-top: 1px solid var(--line); }
+.sx-param-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 11px;
+}
+.sx-param-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--accent-signal);
+  letter-spacing: -0.03em;
+}
+
+.sx-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+.sx-range::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--line-strong);
+}
+.sx-range::-moz-range-track { height: 1px; background: var(--line-strong); }
+.sx-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--accent-signal);
+  border: 0;
+  box-shadow: 0 0 0 4px rgb(212 245 90 / 0.15);
+  transition: box-shadow 300ms var(--ease-expo);
+}
+.sx-range::-webkit-slider-thumb:hover { box-shadow: 0 0 0 8px rgb(212 245 90 / 0.2); }
+.sx-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--accent-signal);
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+ * 22. GALLERY — detail page, pinned left column
+ * ----------------------------------------------------------------------- */
+
+.sx-gallery { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+
+.sx-plate {
+  position: relative;
+  background: var(--bg-secondary);
+  overflow: hidden;
+  aspect-ratio: 4 / 5;
+}
+.sx-plate img,
+.sx-plate > .sx-plate-src {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-size: cover;
+  background-position: center;
+  filter: grayscale(1) contrast(1.2) brightness(0.46);
+  transition: scale 1400ms var(--ease-luxury), filter 900ms var(--ease-luxury);
+}
+.sx-plate:hover img,
+.sx-plate:hover > .sx-plate-src { scale: 1.06; filter: grayscale(0.55) contrast(1.16) brightness(0.58); }
+
+.sx-plate-caption {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* --------------------------------------------------------------------------
+ * 23. FOOTER
+ * ----------------------------------------------------------------------- */
+
+.sx-foot {
+  position: relative;
+  padding: clamp(60px, 9vh, 110px) var(--edge) 34px;
+  border-top: 1px solid var(--line);
+}
+
+.sx-foot-word {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: clamp(3.6rem, 17vw, 17rem);
+  line-height: 0.78;
+  letter-spacing: -0.045em;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--line-strong);
+  margin: 0 0 40px;
+  user-select: none;
+}
+
+.sx-foot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 28px;
+  padding-top: 30px;
+  border-top: 1px solid var(--line);
+}
+
+.sx-foot-link {
+  display: block;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: color 300ms var(--ease-expo);
+}
+.sx-foot-link:hover { color: var(--accent-signal); }
+
+/* --------------------------------------------------------------------------
+ * 24. LOADER
+ * ----------------------------------------------------------------------- */
+
+.sx-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.sx-loader-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50.4%;
+  background: var(--bg-primary);
+  transition: transform 1150ms var(--ease-luxury);
+}
+.sx-loader-half-top { top: 0; }
+.sx-loader-half-bottom { bottom: 0; }
+.sx-loader.is-open .sx-loader-half-top { transform: translateY(-100%); }
+.sx-loader.is-open .sx-loader-half-bottom { transform: translateY(100%); }
+
+.sx-loader-center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  transition: opacity 420ms linear, transform 700ms var(--ease-luxury);
+}
+.sx-loader.is-open .sx-loader-center { opacity: 0; transform: scale(0.94); }
+
+.sx-loader-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2.6rem, 8vw, 5.4rem);
+  letter-spacing: -0.06em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.sx-loader-count sup {
+  font-size: 0.28em;
+  vertical-align: super;
+  color: var(--accent-signal);
+  letter-spacing: 0.1em;
+}
+
+.sx-loader-track { width: min(260px, 54vw); height: 1px; background: var(--line-strong); }
+.sx-loader-track > i {
+  display: block;
+  height: 100%;
+  background: var(--accent-signal);
+  transform-origin: left;
+}
+
+/* --------------------------------------------------------------------------
+ * 25. CONSOLE CHROME
+ *
+ * The product routes keep their light/dark choice, so these rules are scoped
+ * to the console frame rather than applied to :root.
+ * ----------------------------------------------------------------------- */
+
+/* The rail is fixed, so every product page needs the gutter. */
+.shell { padding-left: var(--rail-w); }
+
+/* The pill occupies the top centre. Both the product rail and the page body
+   start below it -- a floating nav that sits on top of a page heading is a
+   floating nav that has to be scrolled away before the page can be read. */
+.app-rail { padding-top: calc(var(--pill-h) + 22px); }
+.shell .page { padding-top: calc(var(--pill-h) + 34px); }
+
+@media (max-width: 900px) {
+  .app-rail { padding-top: calc(var(--pill-h) + 14px); }
+  .shell .page { padding-top: 26px; }
+  .sx-pill-status { display: none; }
+}
+
+@media (max-width: 640px) {
+  :root { --rail-w: 0px; }
+  .sx-rail { display: none; }
+  .sx-pill { top: auto; bottom: 14px; }
+  .app-rail { padding-top: 0; }
+  .shell .page { padding-bottom: calc(var(--pill-h) + 40px); }
+  .sx-pill-nav { overflow-x: auto; scrollbar-width: none; }
+  .sx-pill-nav::-webkit-scrollbar { display: none; }
+}
+
+
+/* --------------------------------------------------------------------------
+ * 25b. THE DOJO CONSOLE
+ * ----------------------------------------------------------------------- */
+
+.dojo-briefing {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.dojo-grid {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) 292px;
+  gap: 18px;
+  align-items: start;
+}
+
+/* The instrument bay. Always dark, in both themes: this is a screen inside
+   the page, and a glowing orb on paper is a sticker rather than a readout. */
+.dojo-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 22px 24px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #14171a 0%, #08090a 72%);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+/* The scanline wash over the bay, so it reads as a display surface. */
+.dojo-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgb(244 243 238 / 0.022) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+.dojo-stage .sx-tag { color: #6e6d68; }
+
+.dojo-scene {
+  flex: 1;
+  min-height: 300px;
+  max-height: 42vh;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 16px 18px;
+  border-top: 1px solid var(--rule);
+}
+
+@media (max-width: 1240px) {
+  .dojo-grid { grid-template-columns: minmax(0, 1fr) 292px; }
+  .dojo-grid > section:first-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 920px) {
+  .dojo-grid,
+  .dojo-briefing { grid-template-columns: minmax(0, 1fr); }
+  .dojo-grid > section:first-child { grid-column: auto; }
+}
+
+
+/* --------------------------------------------------------------------------
+ * 25c. CALL DETAIL — the specification masthead
+ *
+ * The media column scrolls; the spec column sticks. That way the numbers being
+ * argued about stay on screen while the reader moves down through the evidence
+ * for them, which is the whole reason the page exists.
+ * ----------------------------------------------------------------------- */
+
+.call-spec {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  gap: 22px;
+  align-items: start;
+  margin-bottom: 26px;
+}
+
+.call-spec-media {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  padding: 18px 20px 14px;
+}
+
+.call-spec-side {
+  position: sticky;
+  top: calc(var(--pill-h) + 26px);
+}
+
+@media (max-width: 1080px) {
+  .call-spec { grid-template-columns: minmax(0, 1fr); }
+  /* A sticky rail below the thing it annotates is just a rail that will not
+     scroll away. */
+  .call-spec-side { position: static; }
+}
+
+/* --------------------------------------------------------------------------
+ * 26. REDUCED MOTION
+ *
+ * The resting state is the *finished* one, never a faster animation. Pinned
+ * sections unpin, reveals resolve, the orb stops breathing, the grain holds
+ * still. Vestibular disorders are real and a quick animation is still one.
+ * ----------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-word { transform: none; opacity: 1; }
+  .fade-word { opacity: 1; }
+  .sx-rail-stream,
+  .sx-rail::after,
+  .sx-orb-ring-1,
+  .sx-orb-ring-2,
+  .sx-orb-ring-3,
+  .sx-seal,
+  .sx-scroll-hint-track::after,
+  .sx-orb[data-state="idle"] .sx-orb-core { animation: none; }
+
+  /* Unpinned, the slides become ordinary stacked sections. They need the
+     vertical rhythm the pinned stage was giving them, and each one keeps its
+     own plate as a full-bleed backdrop. */
+  .sx-slide {
+    position: relative;
+    inset: auto;
+    opacity: 1;
+    pointer-events: auto;
+    min-height: 0;
+    padding: clamp(56px, 9vh, 96px) var(--edge);
+    border-top: 1px solid var(--line);
+  }
+  .sx-slide-plate { inset: 0; }
+  .sx-pin-stage { height: auto; }
+  .sx-pin-track { height: auto !important; }
+  .svc-col-body { opacity: 1; translate: none; pointer-events: auto; }
+  .svc-col-plate { opacity: 0.5; }
+}
+
+
+/* --------------------------------------------------------------------------
+ * 27. URDU AND BIDIRECTIONAL TEXT
+ *
+ * A Pakistani sales floor moves between Urdu, Roman Urdu and English inside a
+ * single sentence, so direction is a property of each string rather than of
+ * the document. Everything user- or model-authored carries `dir="auto"`; these
+ * rules make the result look deliberate rather than merely correct.
+ * ----------------------------------------------------------------------- */
+
+/* Prose set in Nastaliq -- transcript lines, Dojo turns, quoted passages.
+   The face descends steeply from right to left, so it needs roughly double
+   the leading of a Latin face or the tail of one word lands on the next line.
+   This is why it is opt-in rather than a fallback in the global stack. */
+.urdu-prose {
+  font-family: var(--font-urdu), var(--font-urdu-ui), "Noto Nastaliq Urdu",
+    "Noto Naskh Arabic", serif;
+  line-height: 2.05;
+  /* Nastaliq's optical size runs small against Geist at the same px. */
+  font-size: 1.06em;
+  letter-spacing: 0;
+}
+
+/* An RTL paragraph in an LTR column: the block stays where the layout put it,
+   but the text inside it aligns to its own start edge. Without this the last
+   line of an Urdu turn hangs on the left, which is the single clearest tell
+   that a product was never tested in the language. */
+[dir="rtl"],
+[dir="auto"]:dir(rtl) {
+  text-align: right;
+}
+
+/* Latin runs inside Urdu -- product names, model ids, numbers -- keep their
+   own direction rather than being reordered by the surrounding paragraph. */
+.bidi-isolate {
+  unicode-bidi: isolate;
+}
+
+/* A monospaced technical tag holding Urdu should not try to be monospaced.
+   Naskh has no fixed advance width and forcing tabular figures on it produces
+   gaps between joined letterforms. */
+.sx-tag:dir(rtl) {
+  font-family: var(--font-urdu-ui), "Noto Naskh Arabic", sans-serif;
+  letter-spacing: 0.04em;
+  font-variant-numeric: normal;
+}
+
+/* The language control in the Dojo. */
+.lang-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--paper);
+}
+
+.lang-switch button {
+  flex: 1;
+  display: grid;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.25;
+  text-align: center;
+  transition: background 160ms ease, color 160ms ease;
+}
+.lang-switch button:hover { background: var(--paper-3); color: var(--ink); }
+.lang-switch button[aria-pressed="true"] {
+  background: var(--willow-wash);
+  color: var(--willow);
+  font-weight: 550;
+}
+.lang-switch small {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  font-weight: 400;
+}
+
+/* Print: the chrome is screen furniture and none of it belongs on paper. */
+@media print {
+  .sx-rail,
+  .sx-pill,
+  .sx-cursor,
+  .sx-grain,
+  .sx-vignette,
+  .sx-loader { display: none !important; }
+  .sx-page, .shell { padding-left: 0; }
+}

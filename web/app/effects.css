@@ -1,0 +1,499 @@
+/* ============================================================================
+   Set pieces
+
+   The named effects on the landing page, kept out of globals.css because they
+   belong to one surface rather than to the design system.
+
+   Two rules run through all of them:
+
+   1. Motion lives in CSS wherever it can, on transform / opacity / clip-path,
+      so the compositor animates it and React is not re-rendering a subtree
+      sixty times a second to move a card.
+   2. Every one has a defined resting state under `prefers-reduced-motion` --
+      the finished layout, not a faster animation. Anything that pins scroll
+      unpins; anything that hides content behind a gesture shows it.
+   ========================================================================= */
+
+/* --- Immersive reveal ---------------------------------------------------- */
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  /* Never blocks: the page underneath is live the whole time. */
+  pointer-events: none;
+}
+
+/* Two halves that part, rather than one panel that fades. The split is what
+   makes it read as a curtain over the page instead of a loading screen. */
+.intro-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50.5%;
+  background: var(--paper);
+  transition: transform 1100ms cubic-bezier(0.76, 0, 0.24, 1);
+}
+.intro-half-top { top: 0; }
+.intro-half-bottom { bottom: 0; }
+.intro.is-lifting .intro-half-top { transform: translateY(-100%); }
+.intro.is-lifting .intro-half-bottom { transform: translateY(100%); }
+
+.intro-center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  transition: opacity 420ms ease, transform 700ms cubic-bezier(0.76, 0, 0.24, 1);
+}
+.intro.is-lifting .intro-center { opacity: 0; transform: scale(0.94); }
+
+.intro-mark { animation: intro-mark 1500ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes intro-mark {
+  from { opacity: 0; transform: translateY(14px) scale(0.86); }
+}
+
+.intro-word {
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  animation: intro-word 1300ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
+}
+@keyframes intro-word {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+/* Draws left to right under the wordmark, timed to finish as the halves part. */
+.intro-rule {
+  width: 132px;
+  height: 1px;
+  background: var(--willow);
+  transform-origin: left center;
+  animation: intro-rule 1250ms cubic-bezier(0.65, 0, 0.35, 1) 220ms both;
+}
+@keyframes intro-rule {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro { display: none; }
+}
+
+/* --- On-scroll stacking cards -------------------------------------------- */
+
+.stack { display: flex; flex-direction: column; gap: 26px; }
+
+.stack-card { position: sticky; }
+
+.stack-card-inner {
+  padding: clamp(24px, 3.4vw, 40px);
+  background: var(--paper-2);
+  /* --past is written by the component: 0 while this is the top card, 1 once
+     the next has covered it. Both properties are compositor-only. */
+  transform: scale(calc(1 - var(--past, 0) * 0.055));
+  filter: brightness(calc(1 - var(--past, 0) * 0.2));
+  transition: transform 120ms linear, filter 120ms linear;
+  transform-origin: top center;
+}
+
+.stack-static .stack-card { position: static; }
+.stack-static .stack-card-inner { transform: none; filter: none; }
+
+.stack-card-index {
+  font-size: 11px;
+  color: var(--willow);
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+.stack-card-title { font-size: clamp(1.5rem, 2.6vw, 2.05rem); margin: 0 0 12px; }
+.stack-card-body {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  max-width: 56ch;
+}
+
+/* --- 3D slider ----------------------------------------------------------- */
+
+.slider3d { margin-top: 34px; }
+
+.slider3d-stage {
+  position: relative;
+  height: 340px;
+  /* One vanishing point for the whole arc. Perspective on each card instead
+     gives a row of separately skewed rectangles, not an arc. */
+  perspective: 1500px;
+  transform-style: preserve-3d;
+  /* Cards swinging out of frame must never widen the document -- this is
+     exactly how a carousel usually introduces a scrollbar on a phone. */
+  overflow: hidden;
+  touch-action: pan-y;
+  cursor: grab;
+}
+.slider3d-stage:active { cursor: grabbing; }
+
+.slider3d-stage .slider3d-card {
+  /* Scoped, because these carry `panel` as well and `.panel` sets
+     `position: relative`. Laid out in flow instead of on the arc, the cards
+     stacked vertically and the stage clipped all but the first. */
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(420px, 78vw);
+  margin-left: calc(min(420px, 78vw) / -2);
+  padding: clamp(20px, 2.4vw, 28px);
+  background: var(--paper-2);
+  display: flex;
+  flex-direction: column;
+  transition:
+    transform 760ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 620ms ease;
+  will-change: transform;
+}
+
+.slider3d-title { font-size: clamp(1.3rem, 2.2vw, 1.75rem); margin: 0 0 12px; }
+.slider3d-body { margin: 0; font-size: 13.6px; line-height: 1.62; color: var(--ink-2); }
+
+.slider3d-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 24px;
+}
+.slider3d-dots { display: flex; gap: 8px; }
+.slider3d-dot {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+.slider3d-dot::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto 0;
+  height: 2px;
+  background: var(--rule-strong);
+  transition: background 300ms ease, transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center;
+}
+.slider3d-dot.is-active::after { background: var(--willow); transform: scaleY(2); }
+
+.slider3d-status {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 12px 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slider3d-stage { height: auto; perspective: none; overflow: visible; }
+  .slider3d-stage .slider3d-card {
+    position: relative;
+    left: auto;
+    margin-left: 0;
+    width: 100%;
+    transition: none;
+  }
+}
+
+/* --- Hover carousel ------------------------------------------------------ */
+
+.hcarousel {
+  display: flex;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-top: 34px;
+  height: 320px;
+}
+
+.hcarousel-panel {
+  flex-basis: 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 18px;
+  border: none;
+  background: var(--paper-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.hcarousel-panel.is-open { background: var(--paper-3); }
+
+.hcarousel-index { font-size: 11px; color: var(--willow); font-weight: 500; }
+
+.hcarousel-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1.1;
+  white-space: nowrap;
+  transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* A collapsed panel is a sliver, so its title turns on its side and stays
+   readable rather than being clipped away to nothing. */
+.hcarousel-title.is-vertical {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  margin-top: 6px;
+}
+
+.hcarousel-body {
+  font-size: 13.2px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 460ms ease 90ms, transform 520ms cubic-bezier(0.16, 1, 0.3, 1) 90ms;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hcarousel-panel.is-open .hcarousel-body { opacity: 1; transform: none; }
+
+.hcarousel-meta { color: var(--ink-3); }
+
+@media (max-width: 860px) {
+  /* Six panels sharing a phone would be sixty pixels each. */
+  .hcarousel { flex-direction: column; height: auto; }
+  /* `flex-basis: 0` sizes the main axis, and the main axis is now the vertical
+     one -- so the row rule collapsed every panel to zero height and, with
+     `overflow: hidden`, left a column of index numbers with the titles and
+     bodies clipped away. Height comes from content here. */
+  .hcarousel-panel { flex: 0 0 auto !important; }
+  .hcarousel-title.is-vertical { writing-mode: horizontal-tb; transform: none; margin-top: 0; }
+  .hcarousel-body { opacity: 1; transform: none; }
+}
+
+/* --- Scratch reveal ------------------------------------------------------ */
+
+.scratch-cover {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  cursor: crosshair;
+  touch-action: none;
+  transition: opacity 260ms ease;
+}
+
+/* Always present while the cover is: a drag gesture is not available to
+   everyone, and an interaction with no keyboard path is a wall. */
+.scratch-skip {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+}
+
+/* --- Scroll hub ---------------------------------------------------------- */
+
+.hub { position: relative; --hub-r: 132px; }
+
+.hub-frame {
+  position: sticky;
+  top: 0;
+  /* svh, not vh: on a phone `vh` is taller than the screen actually is, and
+     the bottom of a pinned panel hides under the address bar. */
+  height: 100svh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.hub-inner {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 5vw, 60px);
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: clamp(30px, 6vw, 80px);
+  align-items: center;
+}
+
+.hub-ring {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  justify-self: center;
+}
+
+.hub-ring-rotor {
+  position: absolute;
+  inset: 0;
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hub-spoke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.hub-node {
+  position: absolute;
+  transform-origin: center;
+  translate: -50% -50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 86px;
+  padding: 7px 4px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--paper-2);
+  color: var(--ink-3);
+  font-size: 10px;
+  cursor: pointer;
+  transition:
+    transform 900ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 400ms ease,
+    color 400ms ease,
+    background 400ms ease;
+}
+.hub-node.is-active {
+  border-color: var(--willow);
+  background: var(--willow-wash);
+  color: var(--ink);
+}
+.hub-node-label {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hub-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: 108px;
+  height: 108px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--paper-2) 70%, transparent);
+}
+.hub-core-count { font-size: 26px; color: var(--ink); }
+.hub-core-total { font-size: 13px; color: var(--ink-4); }
+
+.hub-title {
+  font-size: clamp(1.7rem, 3.2vw, 2.6rem);
+  margin: 0 0 16px;
+  animation: hub-in 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hub-body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--ink-2);
+  max-width: 54ch;
+  animation: hub-in 700ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+@keyframes hub-in {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
+.hub-progress {
+  margin-top: 30px;
+  height: 1px;
+  background: var(--rule);
+  max-width: 340px;
+}
+.hub-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--willow);
+  transform-origin: left center;
+  transition: transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hub-static { list-style: none; padding: 0; margin: 34px 0 0; display: grid; gap: 34px; }
+.hub-static .hub-title { font-size: 1.5rem; animation: none; }
+.hub-static .hub-body { animation: none; }
+
+@media (max-width: 880px) {
+  /* The ring needs room a phone does not have, and the detail is the content. */
+  .hub-inner { grid-template-columns: minmax(0, 1fr); }
+  .hub-ring { display: none; }
+}
+
+/* --- Interactive desk ---------------------------------------------------- */
+
+.desk { perspective: 1400px; margin-top: 34px; }
+
+.desk-plane {
+  position: relative;
+  height: 470px;
+  /* The whole desk tips as one rigid body, so the cards share a vanishing
+     point and read as objects lying on a plane. */
+  transform-style: preserve-3d;
+  transform: rotateX(var(--desk-rx, 0deg)) rotateY(var(--desk-ry, 0deg));
+  transition: transform 120ms linear;
+}
+
+.desk-plane .desk-card {
+  /* Scoped for the same reason as the slider card above: `.panel` would
+     otherwise win and drop these into normal flow. */
+  position: absolute;
+  width: min(310px, 74vw);
+  padding: 18px 19px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-items: flex-start;
+  text-align: left;
+  background: var(--paper-2);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition:
+    transform 720ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 520ms ease,
+    border-color 400ms ease;
+}
+.desk-card.is-lifted {
+  box-shadow: var(--shadow-3);
+  border-color: color-mix(in oklab, var(--willow) 45%, var(--rule));
+}
+
+.desk-card-label { color: var(--willow); }
+.desk-card-title { font-size: 20px; line-height: 1.1; }
+.desk-card-lines { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.desk-card-line {
+  font-size: 12.4px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  padding-left: 10px;
+  border-left: 1px solid var(--rule-strong);
+}
+
+@media (max-width: 880px), (prefers-reduced-motion: reduce) {
+  /* Four cards fanned in 3D inside a phone is unreadable; it becomes a column. */
+  .desk { perspective: none; }
+  .desk-plane { height: auto; display: grid; gap: 14px; transform: none; }
+  .desk-plane .desk-card { position: static; width: 100%; transform: none !important; }
+}

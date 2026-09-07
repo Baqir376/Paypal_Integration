@@ -1,0 +1,98 @@
+# What has to be true before this is deployable.
+#
+# Deliberately does not run web/scripts/production.mjs: that check drives a
+# real browser against a running stack with a key configured, and it belongs
+# against the deployment rather than against a pull request. `docs/DEPLOY.md`
+# is where it is run.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A newer push makes an in-flight run irrelevant.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (1007 tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api/requirements*.txt
+
+      - name: Install
+        working-directory: api
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Test
+        working-directory: api
+        run: pytest -q
+
+  web:
+    name: Web (types and build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      # The vault's unlock step is a no-op on a clean checkout -- there is no
+      # key and no ciphertext beside the plaintext -- so this is exactly the
+      # case worth proving: a fresh clone must typecheck and build with no
+      # key, no .env and no network.
+      - name: Typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: web
+        run: npm run build
+
+  images:
+    name: Containers build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # No push, no registry, no secrets. This exists to catch a Dockerfile
+      # that stopped building -- which is otherwise discovered at deploy time,
+      # which is the worst time.
+      - name: API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: api/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

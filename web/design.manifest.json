@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "Files whose contents are the design rather than the product.",
+    "",
+    "`npm run design:lock` encrypts each into <path>.enc. The .enc blobs are",
+    "committed; the plaintext is gitignored. `npm run design:unlock` restores",
+    "them, and runs automatically before dev and build.",
+    "",
+    "With no key, unlock writes design/fallbacks/<path with / as _> instead.",
+    "The rule for a fallback is that the application must still build, run",
+    "and pass its tests -- just plain. A clone that crashes protects nothing",
+    "and looks like a bug."
+  ],
+  "fallbackDir": "design/fallbacks",
+  "protect": [
+    "app/system.css",
+    "app/effects.css",
+    "app/globals.css",
+    "components/system/ChapterSlides.tsx",
+    "components/system/Chrome.tsx",
+    "components/system/Cursor.tsx",
+    "components/system/HorizontalRun.tsx",
+    "components/system/Instruments.tsx",
+    "components/system/Loader.tsx",
+    "components/system/SiteFooter.tsx",
+    "components/system/StatusPill.tsx",
+    "components/system/SvcCols.tsx",
+    "components/system/TelemetryRail.tsx",
+    "components/system/primitives.tsx",
+    "app/page.tsx",
+    "app/archive/page.tsx",
+    "components/Motion.tsx",
+    "app/layout.tsx"
+  ]
+}

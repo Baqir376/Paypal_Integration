@@ -1,0 +1,130 @@
+# Salix, deployed.
+#
+#   cp .env.example .env     and fill in the four values marked REQUIRED
+#   docker compose up -d --build
+#
+# Three containers. Only Caddy is published: it terminates TLS and forwards to
+# Next, Next attaches the API key and forwards to FastAPI, and FastAPI is on
+# an internal network with no published port at all. The key is what stops the
+# API being world-readable, and this is what stops anyone reaching it to try.
+
+name: salix
+
+# Applied to all three services below. Two things a small VM needs and neither
+# of which is on by default:
+#
+#   Log rotation. Docker's json-file driver grows without limit, so a chatty
+#   service eventually fills the disk -- and a full disk takes the database
+#   down with it, which is a much worse failure than the logs being trimmed.
+#
+#   A memory ceiling. Without one, a runaway in any container is free to take
+#   the host with it, including the other two containers and sshd. With one,
+#   the kernel kills the offender and `restart: unless-stopped` brings it back.
+x-runtime: &runtime
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  api:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    # Transcription holds a recording in memory while the graph runs.
+    mem_limit: 2g
+    environment:
+      # REQUIRED. Without it the API is open, and the log says so at startup.
+      SALIX_API_KEY: ${SALIX_API_KEY:?set SALIX_API_KEY in .env}
+      # Live inference. Leave unset to run the deterministic offline twins --
+      # the whole app works, but nothing is really being reasoned about.
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_WORKSPACE_ID: ${DASHSCOPE_WORKSPACE_ID:-}
+      SALIX_DASHSCOPE_REGION: ${SALIX_DASHSCOPE_REGION:-ap-southeast-1}
+      # Or any OpenAI-compatible endpoint for the reasoning layer.
+      SALIX_LLM_BASE_URL: ${SALIX_LLM_BASE_URL:-}
+      SALIX_LLM_API_KEY: ${SALIX_LLM_API_KEY:-}
+      SALIX_LLM_MODEL_DEEP: ${SALIX_LLM_MODEL_DEEP:-}
+      SALIX_LLM_MODEL_FAST: ${SALIX_LLM_MODEL_FAST:-}
+      # SQLite ON THE VOLUME unless a Postgres URL is given. The path is
+      # spelled out rather than left blank: blank falls back to the default
+      # compiled into the image, which is a path inside the container's own
+      # writable layer -- so every redeploy would silently start with an empty
+      # database and the calls uploaded the day before would be gone.
+      SALIX_DATABASE_URL: ${SALIX_DATABASE_URL:-sqlite+aiosqlite:////data/salix.db}
+      # Model Studio fetches uploaded audio itself, so in live mode it needs a
+      # URL it can reach: either OSS, or this host over HTTPS.
+      SALIX_PUBLIC_BASE_URL: ${SALIX_PUBLIC_BASE_URL:-}
+      SALIX_OSS_BUCKET: ${SALIX_OSS_BUCKET:-}
+      SALIX_OSS_ENDPOINT: ${SALIX_OSS_ENDPOINT:-}
+      SALIX_OSS_ACCESS_KEY_ID: ${SALIX_OSS_ACCESS_KEY_ID:-}
+      SALIX_OSS_ACCESS_KEY_SECRET: ${SALIX_OSS_ACCESS_KEY_SECRET:-}
+      SALIX_OSS_PREFIX: ${SALIX_OSS_PREFIX:-salix/audio}
+      SALIX_MAX_UPLOAD_MB: ${SALIX_MAX_UPLOAD_MB:-200}
+      SALIX_RATE_LIMIT_ENABLED: "true"
+      # Same-origin through Next, so no browser ever sends a cross-origin
+      # request to this service. The list stays closed.
+      SALIX_CORS_ORIGINS: ${SALIX_PUBLIC_BASE_URL:-http://localhost:3000}
+    volumes:
+      # The database and the recordings. Without this, a redeploy starts empty.
+      - salix-data:/data
+    networks: [internal]
+    # No `ports:`. This is deliberate and is half the security model.
+
+  web:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      secrets:
+        - design_key
+    restart: unless-stopped
+    # Next serves pre-built output and proxies; it needs very little.
+    mem_limit: 768m
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      SALIX_API_URL: http://api:8000
+      # The same value the API has. Attached server-side; never sent to a page.
+      SALIX_API_KEY: ${SALIX_API_KEY:?set SALIX_API_KEY in .env}
+    networks: [internal, edge]
+
+  caddy:
+    <<: *runtime
+    image: caddy:2-alpine
+    restart: unless-stopped
+    mem_limit: 256m
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # REQUIRED. A real hostname pointed at this machine -- Caddy gets a
+      # certificate for it automatically. Use `localhost` to try it locally.
+      SALIX_DOMAIN: ${SALIX_DOMAIN:?set SALIX_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web]
+    networks: [edge]
+
+networks:
+  # api and web can see each other; nothing on `internal` can reach the
+  # internet-facing side except through web.
+  internal:
+    internal: false
+  edge:
+
+volumes:
+  salix-data:
+  caddy-data:
+  caddy-config:
+
+secrets:
+  design_key:
+    # Optional. Absent, the build ships the neutral design fallbacks.
+    file: ./web/.design-key

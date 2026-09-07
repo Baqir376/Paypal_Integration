@@ -1,0 +1,27 @@
+# TLS, obtained and renewed automatically.
+#
+# This is not a nicety. The Dojo listens through the Web Speech API, and every
+# browser refuses microphone access on a plain-HTTP origin that is not
+# localhost -- so an HTTP deployment loads perfectly and the voice half
+# silently does nothing. Caddy gets a real certificate from Let's Encrypt as
+# soon as SALIX_DOMAIN resolves to this machine.
+
+{$SALIX_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy web:3000 {
+		# Server-sent events: the upload pipeline and the Dojo turn both
+		# stream, and buffering makes them arrive in one lump at the end.
+		flush_interval -1
+	}
+
+	# A 40-minute recording is a slow upload on a sales floor's connection.
+	request_body {
+		max_size 210MB
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
