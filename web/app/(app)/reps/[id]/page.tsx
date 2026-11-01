@@ -61,6 +61,7 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
 
   const { snapshot, calls, plays_used, dojo_sessions } = data;
   const rep = snapshot.rep;
+  const lastTest = dojo_sessions.find((s) => s.mode === "closing_test" && s.assessment);
 
   return (
     <div className="page" data-status="REP PROFILE">
@@ -69,8 +70,8 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
           <Avatar name={rep.name} top={rep.is_top_performer} />
           <div>
             <div className="eyebrow" style={{ marginBottom: 6 }}>
-              Rank {snapshot.rank} of the team
-              {rep.is_top_performer && " · sets the ceiling"}
+              {rep.archived ? "Removed from the team" : `Rank ${snapshot.rank} of the team`}
+              {rep.is_top_performer && !rep.archived && " · sets the ceiling"}
             </div>
             <h1 className="display d2" style={{ margin: 0 }}>
               {rep.name}
@@ -85,13 +86,17 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
                 flexWrap: "wrap",
               }}
             >
-              <span>{snapshot.calls} calls analysed</span>
+              <span>
+                {snapshot.calls} {snapshot.calls === 1 ? "call" : "calls"} analysed
+              </span>
               <span>
                 {snapshot.won}W / {snapshot.lost}L · {percent(snapshot.win_rate)}
               </span>
-              <span className="num">
-                {money(rep.attained)} of {money(rep.quota)} quota
-              </span>
+              {rep.quota > 0 && (
+                <span className="num">
+                  {money(rep.attained)} of {money(rep.quota)} quota
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -185,7 +190,7 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
         <section className="panel-flush">
           <SectionHead
             title="Coaching plan"
-            hint={plan ? "Grounded in your team's winning calls" : undefined}
+            hint={plan?.script?.grounded_in.length ? "Grounded in your team's winning calls" : undefined}
           />
           <div style={{ padding: "14px 18px 18px" }}>
             {!plan && (
@@ -262,14 +267,35 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
                   </div>
                 ))}
 
-                <button
-                  className="btn btn-sm"
-                  onClick={generatePlan}
-                  disabled={coaching}
-                  style={{ marginTop: 14 }}
-                >
-                  {coaching ? "Regenerating…" : "Regenerate"}
-                </button>
+                {lastTest?.assessment && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: "11px 13px",
+                      borderRadius: "var(--r)",
+                      background: "var(--paper-3)",
+                      fontSize: 12.8,
+                    }}
+                  >
+                    <strong style={{ fontWeight: 550 }}>
+                      Last closing test:{" "}
+                      {lastTest.assessment.ready ? "ready to close" : "not there yet"}.
+                    </strong>{" "}
+                    <span style={{ color: "var(--ink-2)" }}>{lastTest.assessment.next_focus}</span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+                  {plan.gaps.length > 0 && (
+                    <Link href={`/dojo?rep=${rep.id}&test=1`} className="btn btn-primary btn-sm">
+                      Test me on this plan
+                      <IconArrow size={11} />
+                    </Link>
+                  )}
+                  <button className="btn btn-sm" onClick={generatePlan} disabled={coaching}>
+                    {coaching ? "Regenerating…" : "Regenerate"}
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -447,7 +473,11 @@ function ScriptPanel({ plan }: { plan: CoachingPlan }) {
     <section className="panel-flush" style={{ marginTop: 22 }}>
       <SectionHead
         title={script.title}
-        hint={`${script.grounded_in.length} passages from real winning calls`}
+        hint={
+          script.grounded_in.length
+            ? `${script.grounded_in.length} passages from real winning calls`
+            : "Written from this rep's own numbers, until colleagues' calls are analysed"
+        }
       />
       <div style={{ padding: "16px 20px 22px" }}>
         <p className="lede" style={{ marginTop: 0, marginBottom: 22, fontSize: 14.5 }}>

@@ -97,6 +97,8 @@ class Call(SalixModel):
     status: CallStatus = CallStatus.UPLOADED
     outcome: CallOutcome = CallOutcome.OPEN
     error: Optional[str] = None
+    #: What the pipeline detected: 'en', 'ur' or 'ur-roman'. Empty until then.
+    language: str = ""
 
 
 class CallDetail(SalixModel):

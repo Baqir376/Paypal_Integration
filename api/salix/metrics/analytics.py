@@ -28,6 +28,12 @@ from ..schemas.report import RepRow, TeamMetrics
 from ..store import repo
 
 
+#: The axes scored from a reading of the call rather than from a measurement of it.
+NEEDS_ANALYSIS = frozenset(
+    {SkillAxis.STORYTELLING, SkillAxis.OBJECTION_HANDLING, SkillAxis.CLOSING}
+)
+
+
 class CallBundle:
     """A call with its artifacts, loaded once and passed around."""
 
@@ -90,6 +96,10 @@ def axis_averages(bundles: Sequence[CallBundle]) -> dict[SkillAxis, float]:
         if bundle.scorecard is None:
             continue
         for axis_score in bundle.scorecard.axes:
+            # On a call the model could not read, these are a neutral placeholder.
+            # Averaged in, they set the team's target at 50 and drag on the rep.
+            if bundle.analysis is None and axis_score.axis in NEEDS_ANALYSIS:
+                continue
             collected[axis_score.axis].append(axis_score.score)
     return {
         axis: round(statistics.fmean(values), 1) if values else 0.0
@@ -109,7 +119,13 @@ def team_ceiling(
     the published benchmark when there is no data at all.
     """
     if top_performer_ids:
-        pool = [by_rep[r] for r in top_performer_ids if r in by_rep]
+        # Only those with calls. A top performer with none scores zero on every
+        # axis, and averaging that in drags the bar down until nobody has a gap.
+        pool = [
+            by_rep[r]
+            for r in top_performer_ids
+            if r in by_rep and any(by_rep[r].values())
+        ]
         if pool:
             return {
                 axis: round(statistics.fmean([p.get(axis, 0.0) for p in pool]), 1)
@@ -133,24 +149,33 @@ def _deal_outcomes(deals: Sequence[Deal], rep_id: str) -> tuple[int, int, int, f
     return len(owned), won, lost, revenue
 
 
-async def rep_snapshots(session: AsyncSession, org_id: str) -> list[RepSnapshot]:
+async def rep_snapshots(
+    session: AsyncSession, org_id: str, *, include_archived: bool = False
+) -> list[RepSnapshot]:
     """The leaderboard. Ranked by overall score, with the team ceiling attached
-    so every radar chart can draw its comparison ring without another call."""
-    reps = await repo.list_reps(session, org_id)
+    so every radar chart can draw its comparison ring without another call.
+
+    Somebody removed from the team is off the board and out of the ceiling, but
+    `include_archived` still finds them: their old calls link to their profile.
+    """
+    everyone = await repo.list_reps(session, org_id)
+    reps = [r for r in everyone if not r.archived]
     deals = await repo.list_deals(session, org_id)
     bundles = await load_bundles(session, org_id)
 
-    by_rep: dict[str, list[CallBundle]] = {r.id: [] for r in reps}
+    by_rep: dict[str, list[CallBundle]] = {r.id: [] for r in everyone}
     for bundle in bundles:
         by_rep.setdefault(bundle.call.rep_id, []).append(bundle)
 
     axes_by_rep = {rep_id: axis_averages(b) for rep_id, b in by_rep.items()}
+    active = {r.id for r in reps}
     ceiling = team_ceiling(
-        axes_by_rep, [r.id for r in reps if r.is_top_performer]
+        {rep_id: axes for rep_id, axes in axes_by_rep.items() if rep_id in active},
+        [r.id for r in reps if r.is_top_performer],
     )
 
     snapshots: list[RepSnapshot] = []
-    for rep in reps:
+    for rep in (everyone if include_archived else reps):
         owned = by_rep.get(rep.id, [])
         scored = [b for b in owned if b.scorecard is not None]
         with_metrics = [b for b in owned if b.metrics is not None]

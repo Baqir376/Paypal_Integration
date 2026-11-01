@@ -27,6 +27,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -156,4 +157,84 @@ class ReportRow(Base):
     org_id: Mapped[str] = mapped_column(String(64), index=True)
     cycle_label: Mapped[str] = mapped_column(String(64))
     data: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class CreditAccountRow(Base):
+    """The running balance, kept so a spend can be one conditional UPDATE."""
+
+    __tablename__ = "credit_accounts"
+    org_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    balance: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class CreditLedgerRow(Base):
+    """Append-only history. `ref` is unique, which is what makes a grant or a
+    refund impossible to apply twice."""
+
+    __tablename__ = "credit_ledger"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(64), index=True)
+    delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(32))
+    ref: Mapped[str] = mapped_column(String(128), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class PaymentOrderRow(Base):
+    """A PayPal order this server created, keyed by PayPal's id.
+
+    Credits and price are copied from the pack at creation, so a later change to
+    the price list cannot alter what an order already in flight is worth.
+    """
+
+    __tablename__ = "payment_orders"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(64), index=True)
+    pack_id: Mapped[str] = mapped_column(String(32))
+    credits: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[str] = mapped_column(String(16))
+    currency: Mapped[str] = mapped_column(String(3))
+    status: Mapped[str] = mapped_column(String(16), default="created", index=True)
+    capture_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class UserRow(Base):
+    """A person who can sign in. Keyed on Google's `sub`, which never changes."""
+
+    __tablename__ = "users"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    google_sub: Mapped[str] = mapped_column(String(255), unique=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    picture: Mapped[str] = mapped_column(String(500), default="")
+    org_id: Mapped[str] = mapped_column(String(64), index=True)
+    role: Mapped[str] = mapped_column(String(16), default="member")
+    #: The salesperson this person is, if they are one.
+    rep_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_login_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SessionRow(Base):
+    """A signed-in browser. Only the hash is kept, so a leaked database cannot be
+    used to sign in as anyone."""
+
+    __tablename__ = "sessions"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+
+
+class InviteRow(Base):
+    __tablename__ = "invites"
+    __table_args__ = (UniqueConstraint("org_id", "email"),)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(64), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(16), default="member")
+    rep_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

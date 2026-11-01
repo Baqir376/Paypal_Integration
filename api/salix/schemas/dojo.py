@@ -68,6 +68,44 @@ class DojoScore(SalixModel):
     talk_ratio_rep: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class GapVerdict(SalixModel):
+    axis: SkillAxis
+    passed: bool
+    evidence: str = ""
+    feedback: str = ""
+
+
+class ClosingVerdict(SalixModel):
+    """What the judging model returns. Checked before anything trusts it."""
+
+    deal_closed: bool
+    close_evidence: str = ""
+    gaps: list[GapVerdict] = Field(default_factory=list)
+    next_focus: str = ""
+    summary: str = ""
+
+
+class GapResult(SalixModel):
+    axis: SkillAxis
+    passed: bool
+    evidence: str = ""
+    feedback: str = ""
+
+
+class ClosingAssessment(SalixModel):
+    """Could this rep close the deal now?"""
+
+    ready: bool
+    deal_closed: bool
+    close_evidence: str = ""
+    gaps: list[GapResult] = Field(default_factory=list)
+    next_focus: str = ""
+    summary: str = ""
+    #: `model`, or `measurements` if no judge was available or the session was too
+    #: short. The second can never report a closed deal.
+    judged_by: str = "model"
+
+
 class DojoSession(SalixModel):
     id: str
     rep_id: str
@@ -86,3 +124,9 @@ class DojoSession(SalixModel):
     turns: list[DojoTurn] = Field(default_factory=list)
     nudges: list[CoachNudge] = Field(default_factory=list)
     score: Optional[DojoScore] = None
+    #: `practice`, or `closing_test` for a roleplay against a coaching plan.
+    mode: str = "practice"
+    plan_id: Optional[str] = None
+    #: Extra instructions for the buyer in a closing test.
+    brief: str = ""
+    assessment: Optional[ClosingAssessment] = None

@@ -42,6 +42,12 @@ log = logging.getLogger("salix.http")
 PUBLIC_PATHS = frozenset({
     "/api/health",
     "/api/ready",
+    "/api/auth/me",
+    "/api/auth/google/start",
+    "/api/auth/google/callback",
+    "/api/auth/logout",
+    # PayPal has no key of ours. Every delivery proves itself with its signature.
+    "/api/billing/webhook",
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -198,6 +204,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         "/api/dojo/start": (20, 60),     # builds a persona from the archive
         "/api/calls/upload": (10, 300),  # a seven-stage graph per call
         "/api/reports/generate": (5, 300),
+        "/api/auth/google": (30, 60),    # one Google round trip per attempt
+        "/api/roleplay/start": (20, 60),  # builds a persona from the archive
+        "/api/billing/checkout": (20, 300),  # creates a real PayPal order
+        "/api/billing/reconcile": (30, 60),  # one PayPal read per open order
         "/api/search": (120, 60),
     }
     #: Everything else, so a runaway loop cannot flood the process.

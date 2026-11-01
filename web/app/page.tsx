@@ -199,7 +199,12 @@ export default function LandingPage() {
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => {});
-    api.overview().then(setOverview).catch(() => {});
+    // The marketing page is public. With accounts on these are refused, and the
+    // page falls back to what it shows with no data, so it must not be sent to login.
+    api.me().then((me) => {
+      if (me.auth_required && !me.user) return;
+      api.overview().then(setOverview).catch(() => {});
+    }).catch(() => {});
 
     // The evidence section renders a genuine analysed call rather than mock
     // geometry. A screenshot of a chart is a claim; a live render is proof.

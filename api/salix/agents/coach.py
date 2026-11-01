@@ -22,7 +22,8 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..metrics import analytics
-from ..schemas.coaching import CoachingPlan, SkillGap, SourceRef
+from ..metrics.scorecard import TOP_PERFORMER
+from ..schemas.coaching import CoachingPlan, Drill, SkillGap, SourceRef
 from ..schemas.common import SkillAxis
 from ..schemas.org import Rep
 from ..store import repo
@@ -78,7 +79,9 @@ You are given:
 WHAT TO PRODUCE
 
 `diagnosis` -- one sentence a sales manager would say out loud. Name the single
-pattern costing this rep the most. Not a list, not hedged.
+pattern costing this rep the most, and it must be about the FIRST shortfall listed.
+Not a list, not hedged. Never criticise anything listed under STRONG SKILLS: those
+numbers are measured, and a rep told the opposite stops trusting the whole plan.
 
 `gaps` -- for each measured shortfall, an `explanation` that says what the rep
 does instead of the right thing, and what it costs them. Reference their actual
@@ -96,20 +99,61 @@ that would tell him what to fix" is right. "Could improve listening" is not.
 - Write words a person would say out loud. No stage directions, no corporate
   register, no phrases like "leverage" or "circle back".
 
-`drills` -- two or three exercises. Each names a success criterion that can be
-checked, and a `persona_hint` describing the buyer to practise against.
+`drills` -- two or three exercises, only on the listed shortfalls. Each names a
+success criterion that can be checked, and a `persona_hint` describing the buyer to
+practise against.
 
 Ground everything in the retrieved passages. If the evidence does not support a
 recommendation, leave it out.
 """
 
 
+#: At or above this, a skill is told to the model as one not to criticise.
+STRONG_SKILL = 70.0
+
+#: When the model cannot be reached, a rep still gets something to practise.
+FALLBACK_DRILLS: dict[SkillAxis, tuple[str, str, str]] = {
+    SkillAxis.LISTENING: (
+        "Hand back the floor",
+        "Run a discovery call and stop talking after every question, however long the silence lasts.",
+        "Talk ratio under 50%, and no unbroken stretch over 60 seconds.",
+    ),
+    SkillAxis.DISCOVERY: (
+        "Quantify the pain",
+        "Before any pitch, ask open questions until the buyer has put a number on the problem and named who decides.",
+        "A figure for the cost of the problem and the name of the economic buyer.",
+    ),
+    SkillAxis.STORYTELLING: (
+        "One customer story",
+        "Answer 'why you?' with a two-minute story about a similar customer, ending on the result they got.",
+        "The story names a situation, a change and a measurable result.",
+    ),
+    SkillAxis.OBJECTION_HANDLING: (
+        "Stay with the objection",
+        "When the buyer objects on price, ask what it is being compared to before answering it.",
+        "The objection is answered and the buyer confirms it is resolved.",
+    ),
+    SkillAxis.PACE_AND_PRESENCE: (
+        "Leave the silence",
+        "After the buyer finishes, wait a full second before replying, and slow down on the numbers.",
+        "No interruptions, and at least a second before each reply.",
+    ),
+    SkillAxis.CLOSING: (
+        "Land a mutual next step",
+        "End the call with a dated next step that the buyer has also committed something to.",
+        "A calendar date, and one action owned by the buyer.",
+    ),
+}
+
+
 class Coach(Agent):
     name = "Coach"
 
     async def run(
-        self, session: AsyncSession, org_id: str, rep: Rep
+        self, session: AsyncSession, org_id: str, rep: Rep, *, focus_call_id: str | None = None
     ) -> CoachingPlan:
+        """`focus_call_id` writes the plan about that call's weak skills rather than
+        the rep's average: a rep is coached on the call they just had."""
         bundles = await analytics.load_bundles(session, org_id, rep_id=rep.id)
         scored = [b for b in bundles if b.scorecard is not None]
 
@@ -120,20 +164,44 @@ class Coach(Agent):
         mine = next((s for s in snapshots if s.rep.id == rep.id), None)
         rep_axes = mine.axes if mine else analytics.axis_averages(scored)
         ceiling = mine.team_axes if mine else {}
+        focus = next((b for b in scored if b.call.id == focus_call_id), None)
+        if focus is not None:
+            rep_axes = {a.axis: a.score for a in focus.scorecard.axes}
 
         gaps = analytics.biggest_gaps(rep_axes, ceiling, limit=3)
         if not gaps:
-            return self._empty_plan(
-                rep, "This rep is at or above the team ceiling on every axis."
+            # Leading the team is not the same as having nothing to learn, and
+            # the first rep on a new team leads it by definition: without this,
+            # their first plan is an empty page. The published benchmark is the
+            # bar that does not depend on who else is on the floor.
+            gaps = analytics.biggest_gaps(rep_axes, TOP_PERFORMER, limit=3)
+        if not gaps:
+            plan = self._empty_plan(
+                rep, "This rep is at or above every benchmark. Nothing to correct."
             )
+            await repo.put_coaching_plan(session, org_id, plan)
+            return plan
 
         retrieved = await self._retrieve(session, org_id, rep, gaps)
-        plan = await self._generate(session, rep, bundles, gaps, retrieved)
+        try:
+            plan = await self._generate(session, rep, bundles, gaps, retrieved, focus, rep_axes)
+        except Exception as exc:  # noqa: BLE001
+            # The gaps are measured and the drills need no model, so an upstream
+            # failure costs the script rather than the plan.
+            log.warning("coach generation failed for %s (%s); using measurements", rep.name, exc)
+            plan = self._measured_plan(rep, gaps)
+        # A drill on a skill the rep is already good at is advice they can see is
+        # wrong. Seen from the real model: discovery at 80, and a discovery drill.
+        weak = {axis for axis, _, _, _ in gaps}
+        plan.drills = [d for d in plan.drills if d.axis in weak]
+        if not plan.drills:
+            plan.drills = self._fallback_drills(gaps)
 
         plan.id = f"plan_{uuid.uuid4().hex[:10]}"
         plan.rep_id = rep.id
         plan.rep_name = rep.name
         plan.generated_at = datetime.now(timezone.utc).isoformat()
+        plan.source_call_id = focus.call.id if focus else None
         await repo.put_coaching_plan(session, org_id, plan)
         return plan
 
@@ -160,16 +228,23 @@ class Coach(Agent):
             query, kind = RETRIEVAL_PLAN[axis]
             embedding = (await self.embeddings.embed([query]))[0]
 
-            results = await repo.search_moments(
-                session,
-                org_id,
-                embedding,
-                kind=kind,
-                outcome="won",
-                exclude_rep_id=rep.id,
-                k=4,
-                diversify=True,
-            )
+            # Won calls first. A team new to Salix has none yet, so colleagues'
+            # open calls are next best. Lost calls never: that is how a rep
+            # learns the thing that lost the deal.
+            results: list[tuple[dict, float]] = []
+            for outcome in ("won", "open"):
+                results = await repo.search_moments(
+                    session,
+                    org_id,
+                    embedding,
+                    kind=kind,
+                    outcome=outcome,
+                    exclude_rep_id=rep.id,
+                    k=4,
+                    diversify=True,
+                )
+                if results:
+                    break
             for moment, score in results:
                 if moment["id"] in seen:
                     continue
@@ -191,11 +266,15 @@ class Coach(Agent):
         bundles: list[analytics.CallBundle],
         gaps: list[tuple[SkillAxis, float, float, float]],
         retrieved: list[tuple[dict, float, SkillAxis]],
+        focus: analytics.CallBundle | None = None,
+        rep_axes: dict[SkillAxis, float] | None = None,
     ) -> CoachingPlan:
         rep_names = {r.id: r.name for r in await repo.list_reps(session, rep.org_id)}
 
         sections = [
             self._gaps_block(gaps, bundles),
+            self._strengths_block(gaps, rep_axes or {}),
+            self._focus_block(focus),
             self._losses_block(bundles),
             self._evidence_block(retrieved, rep_names),
         ]
@@ -224,7 +303,7 @@ class Coach(Agent):
         gaps: list[tuple[SkillAxis, float, float, float]],
         bundles: list[analytics.CallBundle],
     ) -> str:
-        lines = ["MEASURED SHORTFALLS (0-100 scale, against the team ceiling)"]
+        lines = ["MEASURED SHORTFALLS (0-100 scale, against the team ceiling or benchmark)"]
         for axis, rep_value, top_value, delta in gaps:
             lines.append(
                 f"- {axis.value}: this rep {rep_value}, team ceiling {top_value} "
@@ -255,6 +334,34 @@ class Coach(Agent):
             )
         return "\n".join(lines)
 
+    @staticmethod
+    def _strengths_block(
+        gaps: list[tuple[SkillAxis, float, float, float]],
+        rep_axes: dict[SkillAxis, float],
+    ) -> str:
+        weak = {axis for axis, _, _, _ in gaps}
+        strong = [
+            f"- {axis.value}: {value}"
+            for axis, value in rep_axes.items()
+            if axis not in weak and value >= STRONG_SKILL
+        ]
+        return "STRONG SKILLS (measured; do not criticise these)\n" + "\n".join(strong) if strong else ""
+
+    @staticmethod
+    def _focus_block(focus: analytics.CallBundle | None) -> str:
+        """What actually happened on the call this plan is for."""
+        if focus is None or focus.analysis is None:
+            return ""
+        analysis = focus.analysis
+        lines = [f"THE CALL THIS PLAN IS FOR: {focus.call.title}", f"What decided it: {analysis.headline}"]
+        open_ones = [o for o in analysis.objections if not o.handled]
+        lines += [f'- left unresolved ({o.category.value}): "{o.text}"' for o in open_ones[:4]]
+        lines += [f"- went wrong: {i.title}. {i.explanation}" for i in analysis.issues[:4]]
+        lines.append(
+            f"- next step: {analysis.next_step.text}" if analysis.next_step else "- no next step was agreed"
+        )
+        return "\n".join(lines)
+
     def _losses_block(self, bundles: list[analytics.CallBundle]) -> str:
         """What actually beat this rep. The script should answer these, not a
         generic set of textbook objections."""
@@ -282,7 +389,13 @@ class Coach(Agent):
         rep_names: dict[str, str],
     ) -> str:
         if not retrieved:
-            return ""
+            # Told outright. The role says to leave out whatever the evidence
+            # does not support, which with no evidence at all means no script.
+            return (
+                "NO COLLEAGUE CALLS ARE INDEXED YET\n"
+                "Write the script anyway, from this rep's own measurements and "
+                "objections. Set no `source` on any line: there is nothing to cite."
+            )
 
         lines = [
             "EVIDENCE FROM WINNING CALLS BY COLLEAGUES",
@@ -425,6 +538,30 @@ class Coach(Agent):
         if source.call_id:
             return by_call.get(source.call_id)
         return None
+
+    @staticmethod
+    def _fallback_drills(gaps: list[tuple[SkillAxis, float, float, float]]) -> list[Drill]:
+        drills: list[Drill] = []
+        for axis, _, _, _ in gaps:
+            title, instruction, success = FALLBACK_DRILLS[axis]
+            drills.append(
+                Drill(title=title, axis=axis, instruction=instruction, success_criteria=success)
+            )
+        return drills
+
+    def _measured_plan(
+        self, rep: Rep, gaps: list[tuple[SkillAxis, float, float, float]]
+    ) -> CoachingPlan:
+        """A plan from the numbers alone: no script, and it says why."""
+        axis, rep_value, top_value, _ = gaps[0]
+        plan = self._empty_plan(
+            rep,
+            f"Biggest gap is {axis.value.replace('_', ' ')}, at {rep_value} against "
+            f"{top_value}. The written script could not be generated this time; "
+            "regenerate the plan to try again.",
+        )
+        self._repair_gaps(plan, gaps)
+        return plan
 
     def _empty_plan(self, rep: Rep, reason: str) -> CoachingPlan:
         return CoachingPlan(

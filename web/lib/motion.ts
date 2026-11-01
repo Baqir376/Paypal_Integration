@@ -27,6 +27,36 @@ export type Engine = {
 
 let enginePromise: Promise<Engine> | null = null;
 
+/**
+ * Should this wheel or touch event be left to the browser?
+ *
+ * Lenis listens on the window and moves the document, so without this every
+ * scrollable box inside the page froze under the mouse while the page behind it
+ * moved instead. It decides by looking, not from a list of known boxes, so one
+ * added next month works without anyone remembering to mark it.
+ *
+ * Anything inside a modal is always left alone: the page behind it is locked, and
+ * must not move whatever the pointer is over.
+ */
+export function letBrowserScroll(node: HTMLElement): boolean {
+  for (let el: HTMLElement | null = node; el && el !== document.body; el = el.parentElement) {
+    if (el.getAttribute("role") === "dialog" || el.hasAttribute("data-lenis-prevent")) return true;
+    if (el.scrollHeight > el.clientHeight + 1) {
+      const { overflowY } = getComputedStyle(el);
+      if (overflowY === "auto" || overflowY === "scroll") return true;
+    }
+  }
+  return false;
+}
+
+/** Freeze the page behind a modal, for both the browser and Lenis. */
+export function lockPageScroll(locked: boolean): void {
+  document.documentElement.classList.toggle("scroll-locked", locked);
+  const lenis = (window as unknown as { __lenis?: Lenis }).__lenis;
+  if (locked) lenis?.stop();
+  else lenis?.start();
+}
+
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -82,6 +112,7 @@ export function getEngine(): Promise<Engine> {
       // Touch devices already have momentum that feels right. Layering ours on
       // top makes the two fight and the page feels greasy.
       syncTouch: false,
+      prevent: letBrowserScroll,
     });
 
     lenis.on("scroll", ScrollTrigger.update);

@@ -68,7 +68,7 @@ page.on("request", (r) => {
 });
 
 // ---------------------------------------------------------------- pages
-const PAGES = ["/", "/console", "/calls", "/deals", "/playbook", "/report", "/upload", "/dojo", "/archive"];
+const PAGES = ["/", "/console", "/calls", "/team", "/billing", "/deals", "/playbook", "/report", "/upload", "/dojo", "/archive"];
 for (const path of PAGES) {
   try {
     const r = await page.goto(BASE + path, { waitUntil: "networkidle", timeout: 45000 });

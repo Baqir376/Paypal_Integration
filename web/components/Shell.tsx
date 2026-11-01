@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
 import { cx } from "@/lib/format";
-import type { Health } from "@/lib/types";
+import type { BillingState, Health, Me } from "@/lib/types";
 
 import { PageTransition } from "./Motion";
 
@@ -14,10 +14,12 @@ import { CommandPalette } from "./CommandPalette";
 import { Mark } from "./Mark";
 import {
   IconBook,
+  IconCoin,
   IconDeal,
   IconDojo,
   IconGauge,
   IconReport,
+  IconTeam,
   IconUpload,
   IconWave,
 } from "./icons";
@@ -25,6 +27,7 @@ import {
 const NAV = [
   { href: "/console", label: "Command centre", icon: IconGauge },
   { href: "/calls", label: "Calls", icon: IconWave },
+  { href: "/team", label: "Team", icon: IconTeam },
   { href: "/playbook", label: "Playbook", icon: IconBook },
   { href: "/deals", label: "Deals at risk", icon: IconDeal },
   { href: "/dojo", label: "The Dojo", icon: IconDojo },
@@ -33,8 +36,31 @@ const NAV = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  /** Undefined until the API has answered; null if it could not. */
+  const [me, setMe] = useState<Me | null | undefined>(undefined);
+
+  useEffect(() => {
+    api
+      .me()
+      .then(setMe)
+      .catch(() => setMe(null));
+  }, []);
+
+  const mustSignIn = !!me?.auth_required && !me.user;
+  useEffect(() => {
+    if (mustSignIn) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }, [mustSignIn, pathname, router]);
   const [health, setHealth] = useState<Health | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [billing, setBilling] = useState<BillingState | null>(null);
+
+  // On every navigation, because the balance changes elsewhere: spent on the
+  // upload page, bought on the return page.
+  useEffect(() => {
+    if (mustSignIn || me === undefined) return;
+    api.billing().then(setBilling).catch(() => setBilling(null));
+  }, [pathname, mustSignIn, me]);
 
   useEffect(() => {
     let alive = true;
@@ -63,6 +89,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Only once it is known to be closed. Waiting for the answer as well would blank
+  // the page whenever the API is slow or down, when the page's own loading and error
+  // states are what somebody needs. Nothing leaks meanwhile: the API refuses a
+  // signed-out request whatever is on screen.
+  if (mustSignIn) {
+    return <div className="shell-waiting" aria-busy="true" />;
+  }
 
   return (
     <div className="shell">
@@ -134,6 +168,35 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <IconUpload size={15} style={{ color: "var(--ink-3)" }} />
             Analyse a call
           </Link>
+
+          {billing && (billing.enforced || billing.can_purchase) && (
+            <Link
+              href="/billing"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 10px",
+                borderRadius: "var(--r)",
+                fontSize: 13.5,
+                color: pathname.startsWith("/billing") ? "var(--ink)" : "var(--ink-2)",
+                background: pathname.startsWith("/billing") ? "var(--paper-3)" : "transparent",
+              }}
+            >
+              <IconCoin size={15} style={{ color: "var(--ink-3)" }} />
+              Credits
+              <span
+                className="num"
+                style={{
+                  marginLeft: "auto",
+                  fontSize: 12,
+                  color: billing.balance > 0 ? "var(--ink-3)" : "var(--rose)",
+                }}
+              >
+                {billing.balance}
+              </span>
+            </Link>
+          )}
         </nav>
 
         <div className="app-rail-foot">
@@ -156,6 +219,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </kbd>
           </button>
 
+          {me?.user && <Account me={me} />}
           <ModeBadge health={health} />
           <ThemeToggle />
         </div>
@@ -213,6 +277,42 @@ function ModeBadge({ health }: { health: Health | null }) {
       <span className="eyebrow" style={{ color: live ? "var(--ink-2)" : "var(--ink-3)" }}>
         {named ? `${named} live` : "Offline mode"}
       </span>
+    </div>
+  );
+}
+
+function Account({ me }: { me: Me }) {
+  const user = me.user!;
+  const [leaving, setLeaving] = useState(false);
+
+  async function signOut() {
+    setLeaving(true);
+    try {
+      await api.logout();
+    } finally {
+      // A full navigation, so nothing of this person's stays in memory.
+      window.location.assign("/login");
+    }
+  }
+
+  return (
+    <div className="app-rail-account">
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div
+          title={user.email}
+          style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {user.name}
+        </div>
+        <div
+          style={{ fontSize: 11, color: "var(--ink-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {user.org_name}
+        </div>
+      </div>
+      <button className="btn btn-ghost btn-sm" onClick={signOut} disabled={leaving}>
+        Sign out
+      </button>
     </div>
   );
 }

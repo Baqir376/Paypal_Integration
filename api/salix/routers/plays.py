@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from ..store import repo
-from .deps import OrgId, Session
+from .deps import OrgId, Session, owned
 
 router = APIRouter(prefix="/plays", tags=["plays"])
 
@@ -29,9 +29,7 @@ async def list_plays(session: Session, org_id: OrgId) -> list[dict]:
 
 @router.get("/{play_id}")
 async def get_play(session: Session, org_id: OrgId, play_id: str) -> dict:
-    play = await repo.get_play(session, play_id)
-    if play is None:
-        raise HTTPException(status_code=404, detail=f"No play {play_id}")
+    play = owned(await repo.get_play(session, play_id), org_id, "play", play_id)
 
     reps = {r.id: r.name for r in await repo.list_reps(session, org_id)}
     calls = {c.id: c for c in await repo.list_calls(session, org_id, limit=1000)}

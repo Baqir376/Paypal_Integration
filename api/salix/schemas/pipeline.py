@@ -24,6 +24,7 @@ class StageKey(str, Enum):
     PLAYS = "plays"
     EMBED = "embed"
     TRAJECTORY = "trajectory"
+    COACH = "coach"
     DONE = "done"
 
 
@@ -36,6 +37,7 @@ STAGE_LABELS: dict[StageKey, str] = {
     StageKey.PLAYS: "Extracting narrative plays",
     StageKey.EMBED: "Indexing moments",
     StageKey.TRAJECTORY: "Updating deal trajectory",
+    StageKey.COACH: "Writing the coaching plan",
     StageKey.DONE: "Complete",
 }
 
@@ -48,6 +50,7 @@ STAGE_AGENTS: dict[StageKey, str] = {
     StageKey.PLAYS: "Playwright",
     StageKey.EMBED: "Playwright",
     StageKey.TRAJECTORY: "Analyst",
+    StageKey.COACH: "Coach",
     StageKey.DONE: "-",
 }
 

@@ -73,7 +73,7 @@ export function HorizontalRun({
   }, []);
 
   return (
-    <div ref={section} className={`sx-run${className ? ` ${className}` : ""}`}>
+    <div ref={section} tabIndex={0} role="region" aria-label="Scrolling section" className={`sx-run${className ? ` ${className}` : ""}`}>
       {/* The overflow rule lives in CSS rather than inline, because the
           fallback -- a plain draggable scroller on a narrow screen or under
           reduced motion -- is a media query, and a media query cannot

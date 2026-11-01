@@ -28,6 +28,8 @@ REPO = Path(__file__).resolve().parent.parent
 if str(REPO / "api") not in sys.path:
     sys.path.insert(0, str(REPO / "api"))
 
+from sqlalchemy import delete  # noqa: E402
+
 from salix.agents.analyst import Analyst  # noqa: E402
 from salix.agents.coach import Coach  # noqa: E402
 from salix.config import get_settings  # noqa: E402
@@ -39,6 +41,7 @@ from salix.schemas.common import CallOutcome, DealStage  # noqa: E402
 from salix.schemas.deal import Deal  # noqa: E402
 from salix.schemas.org import Org, Rep  # noqa: E402
 from salix.store import db, repo, session_scope  # noqa: E402
+from salix.store.models import OrgRow  # noqa: E402
 
 from . import cast, scripts  # noqa: E402
 
@@ -84,6 +87,9 @@ async def reset_database() -> None:
 async def load_entities() -> None:
     """Write the org, people and deals. Idempotent."""
     async with session_scope() as session:
+        # Started the API first? It made an empty default org, and `first_org`
+        # has to find this one instead.
+        await session.execute(delete(OrgRow).where(OrgRow.id == repo.DEFAULT_ORG_ID))
         await repo.put_org(session, Org(**cast.ORG))
 
         for raw in cast.REPS:

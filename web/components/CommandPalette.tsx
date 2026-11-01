@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "@/lib/api";
+import { lockPageScroll } from "@/lib/motion";
 import { AUTO_DIR, isRtl } from "@/lib/lang";
 import { clock } from "@/lib/format";
 import type { SearchHit } from "@/lib/types";
@@ -26,11 +27,13 @@ import { IconArrow, IconSearch } from "./icons";
 const DESTINATIONS = [
   { label: "Command centre", href: "/console", hint: "Team overview" },
   { label: "Calls", href: "/calls", hint: "Every analysed conversation" },
+  { label: "Team", href: "/team", hint: "Add, edit or remove salespeople" },
   { label: "Playbook", href: "/playbook", hint: "The winning DNA" },
   { label: "Deals at risk", href: "/deals", hint: "Trajectory and risk radar" },
   { label: "The Dojo", href: "/dojo", hint: "Practise against a real buyer" },
   { label: "Cycle report", href: "/report", hint: "End-of-cycle analysis" },
   { label: "Analyse a call", href: "/upload", hint: "Upload a recording" },
+  { label: "Credits", href: "/billing", hint: "Balance and buying more" },
 ];
 
 export function CommandPalette({
@@ -121,6 +124,12 @@ export function CommandPalette({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, rows.length, cursor, choose, onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    lockPageScroll(true);
+    return () => lockPageScroll(false);
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -184,7 +193,7 @@ export function CommandPalette({
           {searching && <span className="eyebrow">searching</span>}
         </div>
 
-        <div style={{ maxHeight: "56vh", overflowY: "auto", padding: 6 }}>
+        <div style={{ maxHeight: "56vh", overflowY: "auto", overscrollBehavior: "contain", padding: 6 }}>
           {rows.length === 0 && (
             <div
               style={{
@@ -196,7 +205,9 @@ export function CommandPalette({
             >
               {query.trim().length < 3
                 ? "Keep typing to search the call archive."
-                : "Nothing matched."}
+                : searching
+                  ? "Searching…"
+                  : "Nothing matched."}
             </div>
           )}
 

@@ -20,6 +20,10 @@ transcript, metrics and an anatomy; it simply contributes no plays. Only
 transcription is fatal, because without it there is nothing to analyse. A
 hackathon demo does not get to show an error page because one model call
 timed out.
+
+Each stage commits. That is what makes the first point true for anybody reading
+from another connection, and on SQLite it is also what stops this graph holding
+the only write lock through minutes of model calls while other uploads time out.
 """
 
 from __future__ import annotations
@@ -32,16 +36,21 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..billing import credits
 from ..config import get_settings
 from ..agents.analyst import Analyst
+from ..metrics.deal import score_deal
 from ..agents.anatomist import Anatomist
+from ..agents.coach import Coach
 from ..agents.playwright import Playwright
 from ..agents.prosodist import Prosodist
 from ..agents.transcriptionist import Transcriptionist
 from ..providers.base import Providers
+from .language import LABELS, transcribe_detecting
 from .romanise import romanise
 from ..schemas.analysis import CallAnalysis
 from ..schemas.call import Call, CallStatus, Transcript
+from ..schemas.coaching import CoachingPlan
 from ..schemas.metrics import CallMetrics, Scorecard
 from ..schemas.pipeline import StageKey, StageStatus
 from ..schemas.play import Play
@@ -62,10 +71,27 @@ class PipelineResult:
     plays: list[Play] = field(default_factory=list)
     failed_stages: list[str] = field(default_factory=list)
     elapsed_ms: int = 0
+    coaching_plan: Optional[CoachingPlan] = None
 
     @property
     def ok(self) -> bool:
         return self.transcript is not None
+
+
+def _caveats(speakers: int, analysis: Optional[CallAnalysis]) -> list[str]:
+    """What the number on the screen cannot be trusted for, said next to it."""
+    caveats: list[str] = []
+    if speakers < 2:
+        caveats.append(
+            "Only one voice was found on this recording, so talk ratio and the "
+            "listening score do not describe a conversation."
+        )
+    if analysis is None:
+        caveats.append(
+            "The call could not be read, so storytelling, objection handling and "
+            "closing are placeholders rather than measurements."
+        )
+    return caveats
 
 
 class Pipeline:
@@ -87,6 +113,7 @@ class Pipeline:
         rep_name: str = "",
         deal_context: str = "",
         language: str = "",
+        coach: bool = False,
     ) -> PipelineResult:
         started = time.monotonic()
         result = PipelineResult(call=call)
@@ -97,16 +124,12 @@ class Pipeline:
         # -- Transcription (fatal on failure) ---------------------------
         await bus.emit(call.id, StageKey.TRANSCRIBE, StageStatus.RUNNING, progress=0.05)
         try:
-            # Whoever uploaded the recording knows what language it was in;
-            # nothing else does. Guessing produced the worst possible failure
-            # -- an Urdu call transcribed into Devanagari, which the metrics
-            # engine reads as English, so it was scored against English pace
-            # benchmarks and the Urdu question detection never ran. Wrong
-            # numbers with no error anywhere.
-            asr = await self.providers.asr.transcribe(
-                audio_url or call.audio_url or "",
-                diarize=True,
-                language_hints=(language,) if language else (),
+            # Nobody is asked. An Urdu call transcribed into Devanagari and
+            # left there is read as English by the metrics engine, and scored
+            # against English pace benchmarks with no error anywhere, so this
+            # has to settle the language before anything measures the call.
+            asr, language = await transcribe_detecting(
+                self.providers, audio_url or call.audio_url or "", requested=language
             )
         except Exception as exc:  # noqa: BLE001
             log.exception("transcription failed for %s", call.id)
@@ -116,6 +139,12 @@ class Pipeline:
             )
             await repo.set_call_status(session, call.id, CallStatus.FAILED, str(exc)[:500])
             result.failed_stages.append(StageKey.TRANSCRIBE.value)
+            await session.commit()
+            await bus.emit(
+                call.id, StageKey.DONE, StageStatus.FAILED,
+                detail=str(exc)[:300], progress=1.0, elapsed_ms=elapsed(),
+                payload={"failed_stages": result.failed_stages},
+            )
             return result
 
         # -- One script -------------------------------------------------
@@ -123,7 +152,11 @@ class Pipeline:
         # Devanagari for `multi`, and neither is what this product shows --
         # nor, in the Devanagari case, what the metrics engine can read: it
         # detects that as English and applies English pace benchmarks.
-        if get_settings().transcript_script == "roman":
+        should_romanise = (
+            language == "ur-roman"
+            or (get_settings().transcript_script == "roman" and language != "ur")
+        )
+        if should_romanise:
             try:
                 asr.sentences, changed = await romanise(self.providers, asr.sentences)
                 if changed:
@@ -133,10 +166,13 @@ class Pipeline:
                 # only inconsistent with the rest of the interface.
                 log.exception("romanising failed for %s; keeping the original", call.id)
 
+        asr.language = language
+        call.language = language
         await bus.emit(
             call.id, StageKey.TRANSCRIBE, StageStatus.OK,
-            detail=f"{len(asr.sentences)} utterances",
+            detail=f"{len(asr.sentences)} utterances, {LABELS.get(language, language)} detected",
             progress=0.2, elapsed_ms=elapsed(),
+            payload={"language": language},
         )
 
         # -- Speaker roles ----------------------------------------------
@@ -148,6 +184,8 @@ class Pipeline:
 
         speakers = len({s.speaker_id for s in transcript.segments})
         await repo.put_artifact(session, call.id, repo.TRANSCRIPT, transcript)
+        await repo.put_call(session, call)
+        await session.commit()
         await bus.emit(
             call.id, StageKey.DIARIZE, StageStatus.OK,
             detail=f"{speakers} speakers separated",
@@ -161,9 +199,11 @@ class Pipeline:
         result.metrics, result.scorecard = metrics, provisional
 
         call.duration_ms = metrics.duration_ms
+        call.status = CallStatus.ANALYZING
         await repo.put_artifact(session, call.id, repo.METRICS, metrics)
         await repo.put_artifact(session, call.id, repo.SCORECARD, provisional)
         await repo.put_call(session, call, score=provisional.overall)
+        await session.commit()
         await bus.emit(
             call.id, StageKey.METRICS, StageStatus.OK,
             detail=(
@@ -187,6 +227,7 @@ class Pipeline:
             )
             result.analysis = analysis
             await repo.put_artifact(session, call.id, repo.ANALYSIS, analysis)
+            await session.commit()
             await bus.emit(
                 call.id, StageKey.ANATOMY, StageStatus.OK,
                 detail=(
@@ -212,6 +253,7 @@ class Pipeline:
                     session, call, transcript, analysis, rep_name=rep_name
                 )
                 result.plays = plays
+                await session.commit()
                 await bus.emit(
                     call.id, StageKey.PLAYS, StageStatus.OK,
                     detail=(
@@ -230,6 +272,7 @@ class Pipeline:
                 )
             except Exception as exc:  # noqa: BLE001
                 log.exception("play extraction failed for %s", call.id)
+                await session.rollback()
                 result.failed_stages.append(StageKey.PLAYS.value)
                 await bus.emit(
                     call.id, StageKey.PLAYS, StageStatus.FAILED,
@@ -244,9 +287,12 @@ class Pipeline:
 
         # -- Final scorecard, now that interpretation exists -------------
         final = self.prosodist.score(metrics, analysis, plays_landed=len(result.plays))
+        final.caveats = _caveats(speakers, analysis)
+        final.deal = score_deal(analysis)
         result.scorecard = final
         await repo.put_artifact(session, call.id, repo.SCORECARD, final)
         await repo.put_call(session, call, score=final.overall)
+        await session.commit()
 
         # -- Deal trajectory (degrades) ---------------------------------
         if call.deal_id:
@@ -266,6 +312,7 @@ class Pipeline:
                     )
             except Exception as exc:  # noqa: BLE001
                 log.exception("trajectory failed for %s", call.id)
+                await session.rollback()
                 result.failed_stages.append(StageKey.TRAJECTORY.value)
                 await bus.emit(
                     call.id, StageKey.TRAJECTORY, StageStatus.FAILED,
@@ -278,14 +325,66 @@ class Pipeline:
             )
 
         await repo.set_call_status(session, call.id, CallStatus.READY)
+        await session.commit()
+
+        # -- Coaching plan (degrades) -----------------------------------
+        # The point of the product, so it is not left waiting behind a button.
+        # After READY, because the call is complete and readable by now, and a
+        # plan is a long model call that only reads what has been committed.
+        if coach:
+            if analysis is None:
+                await bus.emit(
+                    call.id, StageKey.COACH, StageStatus.SKIPPED,
+                    detail="needs call anatomy", progress=0.98,
+                )
+            elif final.deal.score >= (threshold := get_settings().coaching_threshold):
+                await bus.emit(
+                    call.id, StageKey.COACH, StageStatus.SKIPPED,
+                    detail=(
+                        f"deal score {final.deal.score} clears the {threshold:g} "
+                        "threshold, so no plan is needed"
+                    ),
+                    progress=0.98,
+                )
+            else:
+                await bus.emit(call.id, StageKey.COACH, StageStatus.RUNNING, progress=0.98)
+                try:
+                    rep = await repo.get_rep(session, call.rep_id)
+                    if rep is None:
+                        raise ValueError(f"no rep {call.rep_id}")
+                    plan = await Coach(self.providers).run(
+                        session, call.org_id, rep, focus_call_id=call.id
+                    )
+                    await session.commit()
+                    result.coaching_plan = plan
+                    await bus.emit(
+                        call.id, StageKey.COACH, StageStatus.OK,
+                        detail=plan.diagnosis[:200],
+                        progress=0.99, elapsed_ms=elapsed(),
+                        payload={"plan_id": plan.id, "rep_id": rep.id},
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.exception("coaching plan failed for %s", call.id)
+                    await session.rollback()
+                    result.failed_stages.append(StageKey.COACH.value)
+                    await bus.emit(
+                        call.id, StageKey.COACH, StageStatus.FAILED,
+                        detail=str(exc)[:200], elapsed_ms=elapsed(),
+                    )
+
         result.elapsed_ms = elapsed()
 
         await bus.emit(
             call.id, StageKey.DONE, StageStatus.OK,
-            detail=f"score {final.overall}",
+            detail=(
+                f"skill score {final.overall}, deal score {final.deal.score}"
+                if final.deal
+                else f"skill score {final.overall}"
+            ),
             progress=1.0, elapsed_ms=result.elapsed_ms,
             payload={
                 "score": final.overall,
+                "deal_score": final.deal.score if final.deal else None,
                 "failed_stages": result.failed_stages,
             },
         )
@@ -313,15 +412,17 @@ async def run_in_background(
     waiting on the SSE stream.
     """
     pipeline = Pipeline(providers)
+    result: Optional[PipelineResult] = None
     try:
         async with session_scope() as session:
-            await pipeline.run(
+            result = await pipeline.run(
                 session,
                 call,
                 audio_url=audio_url,
                 rep_speaker_id=rep_speaker_id,
                 rep_name=rep_name,
                 language=language,
+                coach=True,
             )
     except Exception as exc:  # noqa: BLE001
         log.exception("background pipeline crashed for %s", call.id)
@@ -335,6 +436,15 @@ async def run_in_background(
                 )
         except Exception:  # noqa: BLE001
             log.exception("could not record failure status for %s", call.id)
+
+    # The credit paid for an analysis. No transcript or no reading of the call
+    # is not one, whatever else the graph managed to save.
+    if result is None or result.analysis is None:
+        try:
+            async with session_scope() as session:
+                await credits.refund_call(session, call.id)
+        except Exception:  # noqa: BLE001
+            log.exception("could not refund the credit for %s", call.id)
 
 
 async def run_batch(

@@ -42,6 +42,9 @@ from .models import (
 
 T = TypeVar("T", bound=BaseModel)
 
+#: The organisation a fresh deployment starts with.
+DEFAULT_ORG_ID = "org_default"
+
 # Artifact kinds. Adding an agent output means adding a constant here.
 TRANSCRIPT = "transcript"
 METRICS = "metrics"
@@ -136,7 +139,8 @@ async def top_performers(session: AsyncSession, org_id: str) -> list[Rep]:
             )
         )
     ).scalars()
-    return [Rep.model_validate(r.data) for r in rows]
+    reps = [Rep.model_validate(r.data) for r in rows]
+    return [r for r in reps if not r.archived]
 
 
 # --------------------------------------------------------------------------
@@ -540,6 +544,21 @@ async def get_dojo_session(
     return DojoSession.model_validate(row.data) if row else None
 
 
+async def dojo_session_is_ours(
+    session: AsyncSession, session_id: str, org_id: str
+) -> bool:
+    """True for a new id too: the first save of a session is how it is created."""
+    row = await session.get(DojoSessionRow, session_id)
+    return row is None or row.org_id == org_id
+
+
+async def get_coaching_plan_by_id(
+    session: AsyncSession, plan_id: str
+) -> Optional[CoachingPlan]:
+    row = await session.get(CoachingPlanRow, plan_id)
+    return CoachingPlan.model_validate(row.data) if row else None
+
+
 async def list_dojo_sessions(
     session: AsyncSession, org_id: str, rep_id: Optional[str] = None, limit: int = 25
 ) -> list[DojoSession]:
@@ -551,7 +570,9 @@ async def list_dojo_sessions(
             query.order_by(DojoSessionRow.created_at.desc()).limit(limit)
         )
     ).scalars()
-    return [DojoSession.model_validate(r.data) for r in rows]
+    # Sessions are saved from their first turn. One still in progress is not history.
+    sessions = [DojoSession.model_validate(r.data) for r in rows]
+    return [s for s in sessions if s.ended_at]
 
 
 async def put_report(session: AsyncSession, report: CycleReport) -> None:

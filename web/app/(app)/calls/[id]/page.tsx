@@ -37,6 +37,12 @@ import {
 } from "@/lib/format";
 import type { CallDetailResponse, EvidenceRef, Segment } from "@/lib/types";
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: "English",
+  ur: "Urdu",
+  "ur-roman": "Roman Urdu",
+};
+
 export default function CallPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [data, setData] = useState<CallDetailResponse | null>(null);
@@ -117,6 +123,7 @@ export default function CallPage({ params }: { params: Promise<{ id: string }> }
             </Link>
             <span>{longDate(call.occurred_at)}</span>
             <span className="num">{duration(call.duration_ms)}</span>
+            {LANGUAGE_LABELS[call.language] && <span>{LANGUAGE_LABELS[call.language]}</span>}
             {deal && (
               <Link href="/deals" style={{ color: "var(--ink-2)" }}>
                 {deal.name}
@@ -130,6 +137,42 @@ export default function CallPage({ params }: { params: Promise<{ id: string }> }
           </div>
         )}
       </header>
+
+      {scorecard?.deal && (
+        <div
+          className="panel"
+          style={{
+            padding: "12px 15px",
+            marginBottom: 20,
+            display: "flex",
+            gap: 14,
+            alignItems: "center",
+            flexWrap: "wrap",
+            fontSize: 13,
+          }}
+        >
+          <span className="num stat-sm" style={{ color: scoreTone(scorecard.deal.score) }}>
+            {scorecard.deal.score.toFixed(0)}
+          </span>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <strong style={{ fontWeight: 550 }}>Deal score: {scorecard.deal.band}. </strong>
+            <span style={{ color: "var(--ink-2)" }}>{scorecard.deal.drivers.join(". ")}</span>
+          </div>
+          <Link href={`/reps/${call.rep_id}`} className="btn btn-sm">
+            Coaching plan
+          </Link>
+        </div>
+      )}
+
+      {(scorecard?.caveats?.length ?? 0) > 0 && (
+        <div
+          className="panel"
+          style={{ padding: "12px 15px", marginBottom: 20, borderColor: "var(--ember)", fontSize: 13 }}
+        >
+          <strong style={{ fontWeight: 550 }}>Read this score with care. </strong>
+          {scorecard?.caveats.join(" ")}
+        </div>
+      )}
 
       {analysis?.headline && (
         <p
@@ -360,6 +403,8 @@ export default function CallPage({ params }: { params: Promise<{ id: string }> }
           />
           <div
             ref={transcriptRef}
+            tabIndex={0}
+            aria-label="Transcript"
             style={{ maxHeight: "72vh", overflowY: "auto", padding: "4px 0" }}
           >
             {transcript?.segments.map((segment) => (

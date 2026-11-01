@@ -56,6 +56,20 @@ class Settings(BaseSettings):
     llm_model_deep: Optional[str] = None
     llm_model_fast: Optional[str] = None
 
+    #: Other models on the same endpoint and key, tried in order when the primary
+    #: refuses. Comma separated.
+    llm_fallback_models: Optional[str] = None
+    #: A different provider entirely, for when the whole vendor is having a bad day.
+    llm_backup_base_url: Optional[str] = None
+    llm_backup_api_key: Optional[str] = None
+    llm_backup_models: Optional[str] = None
+    #: The most a backup route is asked to write in one reply. Free tiers count what
+    #: is requested against a per-minute limit before anything is generated, so asking
+    #: for the primary's 10,000 is refused outright as too large.
+    llm_backup_max_tokens: int = 3500
+    #: The same limit for whichever route this settings object drives. None is no cap.
+    llm_max_tokens_cap: Optional[int] = None
+
     provider_mode: ProviderMode = ProviderMode.AUTO
 
     # --- Models ---------------------------------------------------------
@@ -136,11 +150,138 @@ class Settings(BaseSettings):
     #: Refuse an upload larger than this before reading it into memory.
     max_upload_mb: int = 200
 
+    # --- Credits and PayPal ------------------------------------------------
+    # Only PayPal's own credentials. The APIMatic-generated SDK talks to PayPal
+    # directly, so no APIMatic account or key exists at runtime.
+    paypal_client_id: Optional[str] = None
+    paypal_client_secret: Optional[str] = None
+    #: `sandbox` or `production`. Anything else is sandbox: a typo here must not
+    #: be able to take real money.
+    paypal_environment: str = "sandbox"
+    #: Braintree, PayPal's gateway, whose sandbox does not need a PayPal account.
+    braintree_merchant_id: Optional[str] = None
+    braintree_public_key: Optional[str] = None
+    braintree_private_key: Optional[str] = None
+
+    #: Run the purchase flow against a labelled stand-in, for developers who cannot
+    #: get PayPal keys. Real keys win, and it never runs in production.
+    paypal_simulator: bool = False
+    #: Identifies which webhook a delivery was signed for. Without it, deliveries
+    #: are refused rather than accepted unchecked.
+    paypal_webhook_id: Optional[str] = None
+
+    #: `auto`, `on` or `off`. `auto` charges credits only when PayPal is
+    #: configured, so a fresh clone still runs end to end with no accounts.
+    billing_mode: str = "auto"
+
+    #: Where a browser reaches this app. PayPal sends the buyer back here.
+    app_url: str = "http://localhost:3000"
+
+    # --- Accounts -----------------------------------------------------------
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
+    #: `auto`, `on` or `off`. `auto` requires sign-in once Google is configured, so
+    #: a fresh clone still runs with no accounts.
+    auth_mode: str = "auto"
+    session_days: int = 30
+    #: This person claims the data already in the database on first sign-in.
+    owner_email: Optional[str] = None
+
+    # --- Invitation email -----------------------------------------------------
+    smtp_host: Optional[str] = None
+    smtp_port: int = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from: Optional[str] = None
+
+    # --- Coaching -----------------------------------------------------------
+    #: A call whose deal score is below this gets a coaching plan automatically.
+    coaching_threshold: float = 75.0
+
     # --- Behaviour ------------------------------------------------------
     llm_timeout_s: float = 120.0
     asr_poll_interval_s: float = 3.0
     asr_max_wait_s: float = 900.0
     max_retries: int = 3
+
+    @staticmethod
+    def _names(value: Optional[str]) -> list[str]:
+        return [name.strip() for name in (value or "").split(",") if name.strip()]
+
+    @property
+    def llm_fallback_list(self) -> list[str]:
+        return self._names(self.llm_fallback_models)
+
+    @property
+    def llm_backup_list(self) -> list[str]:
+        return self._names(self.llm_backup_models)
+
+    @property
+    def mail_configured(self) -> bool:
+        return bool(self.smtp_host and self.smtp_from)
+
+    @property
+    def google_configured(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def auth_required(self) -> bool:
+        """Whether every request needs a signed-in person. An unrecognised value
+        requires it: a mistyped setting must not open the data to everyone."""
+        mode = self.auth_mode.strip().lower()
+        if mode == "off":
+            return False
+        if mode == "auto" or not mode:
+            return self.google_configured
+        return True
+
+    @property
+    def paypal_has_keys(self) -> bool:
+        return bool(self.paypal_client_id and self.paypal_client_secret)
+
+    @property
+    def paypal_simulated(self) -> bool:
+        return (
+            self.paypal_simulator
+            and not self.paypal_has_keys
+            and not self.braintree_configured
+            and self.paypal_mode == "sandbox"
+        )
+
+    @property
+    def braintree_configured(self) -> bool:
+        return bool(
+            self.braintree_merchant_id and self.braintree_public_key and self.braintree_private_key
+        )
+
+    @property
+    def payment_provider(self) -> Optional[str]:
+        """Who takes the money. PayPal first, then Braintree, then the labelled stand-in."""
+        if self.paypal_has_keys:
+            return "paypal"
+        if self.braintree_configured:
+            return "braintree"
+        return "simulator" if self.paypal_simulated else None
+
+    @property
+    def paypal_configured(self) -> bool:
+        """Whether credits can be bought, for real or in simulation."""
+        return self.paypal_has_keys or self.paypal_simulated
+
+    @property
+    def paypal_mode(self) -> str:
+        return "production" if self.paypal_environment.strip().lower() == "production" else "sandbox"
+
+    @property
+    def billing_enforced(self) -> bool:
+        """Whether an upload costs a credit. An unrecognised value charges: a
+        mistyped setting must not quietly give the product away."""
+        mode = self.billing_mode.strip().lower()
+        if mode == "off":
+            return False
+        if mode == "auto" or not mode:
+            return self.payment_provider is not None
+        return True
 
     @property
     def resolved_mode(self) -> ProviderMode:
@@ -222,6 +363,8 @@ class Settings(BaseSettings):
         """Who is listening. Deepgram wins when both are configured: it takes
         the audio in the request body, so it works without the public URL,
         signed or otherwise, that Model Studio requires."""
+        if not self.asr_is_live:
+            return "offline twin"
         if self.deepgram_api_key:
             return "deepgram"
         if self.dashscope_api_key:
@@ -330,7 +473,7 @@ def get_settings() -> Settings:
     #
     # Only fields with a meaningful non-empty default are listed: leaving a
     # key blank must still mean no key.
-    for field in ("database_url", "storage_dir", "cors_origins", "dashscope_region"):
+    for field in ("database_url", "storage_dir", "cors_origins", "dashscope_region", "app_url"):
         if isinstance(getattr(settings, field, None), str) and not getattr(settings, field).strip():
             setattr(settings, field, type(settings).model_fields[field].default)
 
@@ -347,5 +490,13 @@ def get_settings() -> Settings:
         settings.llm_base_url = os.getenv("LLM_BASE_URL")
     if not settings.api_key:
         settings.api_key = os.getenv("SALIX_API_KEY")
+    if not settings.google_client_id:
+        settings.google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if not settings.google_client_secret:
+        settings.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    if not settings.paypal_client_id:
+        settings.paypal_client_id = os.getenv("PAYPAL_CLIENT_ID")
+    if not settings.paypal_client_secret:
+        settings.paypal_client_secret = os.getenv("PAYPAL_CLIENT_SECRET")
     settings.audio_dir.mkdir(parents=True, exist_ok=True)
     return settings

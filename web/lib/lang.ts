@@ -71,30 +71,17 @@ export type SpeechLang = {
    * British voice reading Urdu words it cannot pronounce. Which is what used
    * to happen.
    */
-  voice: "en" | "ur-roman";
+  voice: "en" | "ur-roman" | "ur";
   /** Fallback tags to try if no installed voice matches `tag`. */
   fallbacks: string[];
   rtl: boolean;
 };
 
 /**
- * Two, and only two.
+ * Supported speech languages: English, Roman Urdu, and Urdu (Nastaliq).
  *
- * This is what a Karachi or Lahore floor actually speaks on a sales call.
- * There is no Urdu-script option: a rep dictating "aap ki price bohat zyada
- * hai" wants those words back in the same letters they said them in, and an
- * Urdu recogniser handed Roman Urdu tries to emit Nastaliq, which is neither
- * what was said nor what they can read back at a glance.
- *
- * So Roman Urdu is mapped to `en-PK`, not `ur-PK`. It is Urdu vocabulary in
- * Latin script, and Pakistani-accented English recognition is by far the
- * closer acoustic match. It also means dictation works in every browser that
- * has speech recognition at all, rather than failing with
- * `language-not-supported` the way `ur-PK` does on most of them.
- *
- * The two entries used to be four -- an Urdu-script option and a second,
- * identically labelled "English". A control offering "English" twice is a
- * control nobody trusts.
+ * This covers Pakistani sales floors running calls across English, Roman Urdu
+ * (Latin script), and native Urdu (Nastaliq script).
  */
 export const SPEECH_LANGS: SpeechLang[] = [
   {
@@ -115,11 +102,22 @@ export const SPEECH_LANGS: SpeechLang[] = [
     fallbacks: ["en-IN", "en-GB", "en-US", "en"],
     rtl: false,
   },
+  {
+    id: "ur",
+    label: "اردو (Urdu)",
+    native: "نستعلیق رسم الخط",
+    tag: "ur-PK",
+    voice: "ur",
+    fallbacks: ["ur", "ar-SA", "ar"],
+    rtl: true,
+  },
 ];
 
 /** What the model is told to answer in. Sent with every Dojo turn. */
-export function replyLanguage(id: string): "en" | "ur-roman" {
-  return id === "roman" ? "ur-roman" : "en";
+export function replyLanguage(id: string): "en" | "ur-roman" | "ur" {
+  if (id === "roman" || id === "ur-roman") return "ur-roman";
+  if (id === "ur") return "ur";
+  return "en";
 }
 
 export function langById(id: string): SpeechLang {

@@ -77,3 +77,5 @@ class CoachingPlan(SalixModel):
     prescription_rationale: dict[str, str] = Field(default_factory=dict)
     script: Optional[GeneratedScript] = None
     drills: list[Drill] = Field(default_factory=list)
+    #: The call this plan was written from, when one triggered it.
+    source_call_id: Optional[str] = None

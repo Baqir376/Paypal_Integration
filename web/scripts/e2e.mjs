@@ -641,7 +641,10 @@ await run("Upload validation", async () => {
   text = await page.locator("body").innerText();
   check("a valid recording is accepted", /discovery-call\.mp3/.test(text));
   check("accepting a file clears the earlier rejection", !/is empty|not a recording/i.test(text));
-  check("a valid recording enables submit", await submitEnabled());
+  check("a recording alone does not enable submit", !(await submitEnabled()));
+  await page.getByPlaceholder("Bilal's Call").fill("Bilal's Call");
+  check("a recording and a name enable submit", await submitEnabled());
+  check("there is no language dropdown", (await page.locator('select[name="language"]').count()) === 0);
 
   // The same checks must hold for a drop, which never touches `accept`.
   await open(page, "/upload");

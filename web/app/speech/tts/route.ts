@@ -195,7 +195,11 @@ export async function GET(request: Request) {
   // path -- which must be split at 180 characters -- get used.
   try {
     const neural = await fetch(neuralUpstream(text, lang), {
-      headers: API_KEY ? { "X-API-Key": API_KEY } : undefined,
+      headers: {
+        ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+        // The API only speaks for somebody signed in, when accounts are on.
+        ...(request.headers.get("cookie") ? { Cookie: request.headers.get("cookie")! } : {}),
+      },
       signal: AbortSignal.timeout(20000),
     });
     if (neural.ok) {

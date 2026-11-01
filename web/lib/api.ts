@@ -10,6 +10,11 @@
  */
 
 import type {
+  DealCalibration,
+  Me,
+  TeamState,
+  TeamInvite,
+  BillingState,
   CallDetailResponse,
   CallSummary,
   CoachingPlan,
@@ -18,10 +23,12 @@ import type {
   DojoSession,
   DojoStartResponse,
   Health,
+  OrderResult,
   Overview,
   PipelineEvent,
   PlayDetail,
   PlayWithInstance,
+  Rep,
   RepProfile,
   RepSnapshot,
   SearchHit,
@@ -40,6 +47,9 @@ export class ApiError extends Error {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Must match SIGN_IN_REQUIRED in api/salix/routers/deps.py. */
+const SIGN_IN_REQUIRED = "Sign in to continue.";
 
 /**
  * How many times a read is retried before it is reported as a failure.
@@ -95,6 +105,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* a non-JSON error body is fine; the status line is enough */
     }
+    // The session ended, here or in another tab. The other 401, a mismatched API
+    // key, is a deployment fault that signing in cannot fix, so it stays an error.
+    if (
+      response.status === 401 &&
+      detail === SIGN_IN_REQUIRED &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/login")
+    ) {
+      const here = window.location.pathname + window.location.search;
+      window.location.assign(`/login?next=${encodeURIComponent(here)}`);
+    }
     throw new ApiError(response.status, detail, retryable);
   }
 
@@ -120,6 +141,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<Health>("/api/health"),
+  me: () => request<Me>("/api/auth/me"),
+  logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+
+  team: () => request<TeamState>("/api/team"),
+  invite: (email: string, rep_id?: string) =>
+    request<TeamInvite>("/api/team/invites", {
+      method: "POST",
+      body: JSON.stringify({ email, rep_id: rep_id || null }),
+    }),
+  cancelInvite: (id: string) => request<void>(`/api/team/invites/${id}`, { method: "DELETE" }),
+  resendInvite: (id: string) =>
+    request<TeamInvite>(`/api/team/invites/${id}/resend`, { method: "POST" }),
+  setRole: (id: string, role: "owner" | "member") =>
+    request<unknown>(`/api/team/members/${id}`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  dealCalibration: () => request<DealCalibration>("/api/reports/deal-calibration"),
+  removeMember: (id: string) => request<void>(`/api/team/members/${id}`, { method: "DELETE" }),
+
+  roleplay: {
+    start: (rep_id: string, language = "en") =>
+      request<DojoStartResponse>("/api/roleplay/start", {
+        method: "POST",
+        body: JSON.stringify({ rep_id, language }),
+      }),
+  },
   overview: () => request<Overview>("/api/overview"),
 
   calls: (params: { rep_id?: string; deal_id?: string; limit?: number } = {}) => {
@@ -133,6 +178,13 @@ export const api = {
 
   reps: () => request<RepSnapshot[]>("/api/reps"),
   rep: (id: string) => request<RepProfile>(`/api/reps/${id}`),
+  archivedReps: () => request<Rep[]>("/api/reps/archived"),
+  addRep: (name: string) =>
+    request<Rep>("/api/reps", { method: "POST", body: JSON.stringify({ name }) }),
+  editRep: (id: string, update: { name?: string; quota?: number }) =>
+    request<Rep>(`/api/reps/${id}`, { method: "PATCH", body: JSON.stringify(update) }),
+  removeRep: (id: string) => request<void>(`/api/reps/${id}`, { method: "DELETE" }),
+  restoreRep: (id: string) => request<Rep>(`/api/reps/${id}/restore`, { method: "POST" }),
   coach: (id: string) =>
     request<CoachingPlan>(`/api/reps/${id}/coach`, { method: "POST" }),
 
@@ -157,6 +209,28 @@ export const api = {
 
   upload: (form: FormData) =>
     request<UploadResponse>("/api/calls/upload", { method: "POST", body: form }),
+
+  billing: () => request<BillingState>("/api/billing"),
+  checkout: (pack_id: string) =>
+    request<{ order_id: string; approve_url: string }>("/api/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ pack_id }),
+    }),
+  braintreeToken: () =>
+    request<{ client_token: string }>("/api/billing/braintree/client-token", { method: "POST" }),
+  braintreePay: (pack_id: string, nonce: string) =>
+    request<OrderResult>("/api/billing/braintree/pay", {
+      method: "POST",
+      body: JSON.stringify({ pack_id, nonce }),
+    }),
+  captureOrder: (id: string) =>
+    request<OrderResult>(`/api/billing/orders/${encodeURIComponent(id)}/capture`, {
+      method: "POST",
+    }),
+  reconcileBilling: () =>
+    request<{ checked: number; balance: number }>("/api/billing/reconcile", {
+      method: "POST",
+    }),
 
   dojo: {
     start: (rep_id: string, difficulty = 2, scenario = "", language = "en") =>

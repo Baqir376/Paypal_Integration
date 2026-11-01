@@ -156,14 +156,14 @@ class EdgeTTS:
     ) -> bytes:
         line = _speakable(text)
         if not line:
-            raise ProviderError("nothing to synthesise")
+            raise ProviderError("tts", "nothing to synthesise")
 
         # Imported here so the dependency is only paid for when speech is
         # actually asked for.
         try:
             import edge_tts
         except ImportError as exc:  # pragma: no cover - dependency is declared
-            raise ProviderError("edge-tts is not installed") from exc
+            raise ProviderError("tts", "edge-tts is not installed") from exc
 
         chosen = voice if voice in self.voices() else voice_for(line, language)
         rate = rate_for(line, language)
@@ -178,10 +178,10 @@ class EdgeTTS:
         except Exception as exc:
             # Undocumented upstream. A clean failure lets the caller fall back
             # to saying nothing, which is the honest outcome.
-            raise ProviderError(f"edge tts unavailable: {exc}") from exc
+            raise ProviderError("tts", f"edge tts unavailable: {exc}") from exc
 
         if not audio:
-            raise ProviderError("edge tts returned no audio")
+            raise ProviderError("tts", "edge tts returned no audio")
 
         if out_path:
             with open(out_path, "wb") as handle:

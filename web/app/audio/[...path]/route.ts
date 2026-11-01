@@ -33,6 +33,9 @@ async function proxy(request: Request, path: string[], method: "GET" | "HEAD") {
   // Seeking. Without this every scrub refetches the file from the beginning.
   const range = request.headers.get("range");
   if (range) headers.set("Range", range);
+  // With accounts on, who is asking decides whether they get this recording.
+  const cookie = request.headers.get("cookie");
+  if (cookie) headers.set("Cookie", cookie);
 
   let upstream: Response;
   try {

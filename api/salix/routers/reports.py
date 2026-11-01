@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from ..agents.analyst import Analyst
+from ..metrics import analytics
+from ..metrics.deal import Calibration, calibrate
+from ..schemas.common import CallOutcome
 from ..store import repo
-from .deps import OrgId, Prov, Session
+from .deps import OrgId, Prov, Session, owned
 
 log = logging.getLogger("salix.routers.reports")
 
@@ -38,9 +41,22 @@ async def generate_report(
     return report.model_dump(mode="json")
 
 
+@router.get("/deal-calibration", response_model=Calibration)
+async def deal_calibration(session: Session, org_id: OrgId) -> Calibration:
+    """Does the deal score predict this team's real outcomes?"""
+    bundles = await analytics.load_bundles(session, org_id)
+    return calibrate(
+        [
+            (b.scorecard.deal.score, b.call.outcome is CallOutcome.WON)
+            for b in bundles
+            if b.scorecard is not None
+            and b.scorecard.deal is not None
+            and b.call.outcome in (CallOutcome.WON, CallOutcome.LOST)
+        ]
+    )
+
+
 @router.get("/{report_id}")
-async def get_report(session: Session, report_id: str) -> dict:
-    report = await repo.get_report(session, report_id)
-    if report is None:
-        raise HTTPException(status_code=404, detail=f"No report {report_id}")
+async def get_report(session: Session, org_id: OrgId, report_id: str) -> dict:
+    report = owned(await repo.get_report(session, report_id), org_id, "report", report_id)
     return report.model_dump(mode="json")

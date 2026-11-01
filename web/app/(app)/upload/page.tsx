@@ -9,6 +9,7 @@
  * doing the work and reports what it found.
  */
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -16,7 +17,13 @@ import { IconArrow, IconCheck, IconUpload, IconWarning } from "@/components/icon
 import { ErrorState } from "@/components/ui";
 import { ApiError, api, subscribeToPipeline } from "@/lib/api";
 import { cx } from "@/lib/format";
-import type { PipelineEvent, RepSnapshot, StageKey, StageStatus } from "@/lib/types";
+import type {
+  BillingState,
+  PipelineEvent,
+  RepSnapshot,
+  StageKey,
+  StageStatus,
+} from "@/lib/types";
 
 /**
  * What the API will accept, mirrored from `ALLOWED_SUFFIXES` and
@@ -60,6 +67,7 @@ const STAGES: { key: StageKey; label: string; agent: string }[] = [
   { key: "plays", label: "Extracting plays", agent: "Playwright" },
   { key: "embed", label: "Indexing moments", agent: "Playwright" },
   { key: "trajectory", label: "Updating deal trajectory", agent: "Analyst" },
+  { key: "coach", label: "Writing the coaching plan", agent: "Coach" },
 ];
 
 export default function UploadPage() {
@@ -73,6 +81,9 @@ export default function UploadPage() {
   const [events, setEvents] = useState<Map<StageKey, PipelineEvent>>(new Map());
   const [failure, setFailure] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
+  const [salesperson, setSalesperson] = useState("");
+  const [repId, setRepId] = useState<string | null>(null);
+  const [billing, setBilling] = useState<BillingState | null>(null);
   /**
    * Whether real audio can actually be transcribed right now.
    *
@@ -111,6 +122,11 @@ export default function UploadPage() {
       .then(setReps)
       .catch((e: ApiError) => setError(e));
 
+    api
+      .billing()
+      .then(setBilling)
+      .catch(() => setBilling(null));
+
     // Separate from the rep list: a failure here must not blank the page, it
     // must only leave the promise unqualified.
     api
@@ -126,12 +142,14 @@ export default function UploadPage() {
 
     const form = new FormData(event.currentTarget);
     form.set("file", file);
+    form.set("salesperson", salesperson);
 
     setSubmitting(true);
     setFailure(null);
     try {
       const response = await api.upload(form);
       setCallId(response.call_id);
+      setRepId(response.rep_id);
       unsubscribe.current = subscribeToPipeline(
         response.call_id,
         (pipelineEvent) => {
@@ -140,10 +158,9 @@ export default function UploadPage() {
             next.set(pipelineEvent.stage, pipelineEvent);
             return next;
           });
-          if (
-            pipelineEvent.stage === "transcribe" &&
-            pipelineEvent.status === "failed"
-          ) {
+          // A failed stage is not the end of the graph, only of the run: the
+          // pipeline finishes what it can and says so in its last event.
+          if (pipelineEvent.stage === "done" && pipelineEvent.status === "failed") {
             setFailure(pipelineEvent.detail);
           }
         },
@@ -152,12 +169,22 @@ export default function UploadPage() {
     } catch (e) {
       setFailure((e as ApiError).detail);
       setSubmitting(false);
+      // Out of credits, or someone else took the last one: show what is true now.
+      if ((e as ApiError).status === 402) api.billing().then(setBilling).catch(() => {});
     }
   }
 
   if (error && !reps.length) return <ErrorState message={error.detail} status={error.status} />;
 
   const done = events.get("done");
+  const degraded = (done?.payload?.failed_stages as string[] | undefined) ?? [];
+  const outOfCredits = !!billing?.enforced && billing.balance < billing.call_cost;
+  const typed = salesperson.trim().replace(/(['’]s)?\s+call$/i, "").toLowerCase();
+  const known = reps.some(
+    ({ rep }) =>
+      rep.name.toLowerCase() === typed ||
+      (!typed.includes(" ") && rep.name.split(" ")[0].toLowerCase() === typed),
+  );
 
   return (
     <div data-status="ANALYSE A CALL" className="page" style={{ maxWidth: 940 }}>
@@ -172,7 +199,7 @@ export default function UploadPage() {
           <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
             {canTranscribe === false
               ? "Six agents will measure the conversation, read its anatomy, and mine it for reusable moves — but not yours, in this configuration. See below."
-              : "Drop a recording in. Six agents will transcribe it, separate the speakers, measure the conversation, read its anatomy, and mine it for reusable moves."}
+              : "Drop a recording in and say whose call it is. English, Urdu or Roman Urdu is detected for you, and you get a score and a coaching plan back."}
           </p>
         </div>
       </header>
@@ -199,6 +226,37 @@ export default function UploadPage() {
             or wire in another provider with diarization, and this notice goes
             away.
           </p>
+        </div>
+      )}
+
+      {billing?.enforced && !callId && (
+        <div
+          className="panel"
+          style={{
+            padding: "12px 15px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            borderColor: outOfCredits ? "var(--rose)" : "var(--rule)",
+            fontSize: 13,
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 200 }}>
+            {outOfCredits ? (
+              "You are out of credits. Each recording uses one."
+            ) : (
+              <>
+                <span className="num">{billing.balance}</span>{" "}
+                {billing.balance === 1 ? "credit" : "credits"} left. This uses one,
+                and it is returned if the analysis fails.
+              </>
+            )}
+          </span>
+          <Link href="/billing" className={outOfCredits ? "btn btn-primary btn-sm" : "btn btn-sm"}>
+            Buy credits
+          </Link>
         </div>
       )}
 
@@ -256,70 +314,60 @@ export default function UploadPage() {
             )}
           </label>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-              gap: 14,
-              marginBottom: 20,
-            }}
-          >
-            <Field label="Call title">
+          <div style={{ marginBottom: 16 }}>
+            <Field label="Salesperson">
               <input
-                name="title"
-                required
                 className="field"
-                placeholder="Discovery with Northwind"
-              />
-            </Field>
-            <Field label="Account">
-              <input
-                name="account"
                 required
-                className="field"
-                placeholder="Northwind Logistics"
+                list="team-names"
+                maxLength={90}
+                autoComplete="off"
+                placeholder="Bilal's Call"
+                value={salesperson}
+                onChange={(e) => setSalesperson(e.target.value)}
               />
-            </Field>
-            <Field label="Rep">
-              <select name="rep_id" required className="field" defaultValue="">
-                <option value="" disabled>
-                  Who ran this call?
-                </option>
-                {reps.map((snapshot) => (
-                  <option key={snapshot.rep.id} value={snapshot.rep.id}>
-                    {snapshot.rep.name}
-                  </option>
+              <datalist id="team-names">
+                {reps.map(({ rep }) => (
+                  <option key={rep.id} value={rep.name} />
                 ))}
-              </select>
+              </datalist>
             </Field>
-            <Field label="Outcome">
-              <select name="outcome" className="field" defaultValue="open">
-                <option value="open">Still open</option>
-                <option value="won">Won</option>
-                <option value="lost">Lost</option>
-              </select>
-            </Field>
-            {/* Nothing but the person who was on the call can answer this, and
-                guessing it wrong is not a small error: an Urdu recording asked
-                for as English comes back as fluent invention, and asked for as
-                multilingual comes back in Devanagari, which the metrics engine
-                reads as English and scores against English pace benchmarks. */}
-            <Field label="Language spoken">
-              <select name="language" className="field" defaultValue="">
-                <option value="">Both — switches between them</option>
-                <option value="en">English</option>
-                <option value="ur">Urdu</option>
-              </select>
-            </Field>
+            {typed && !known && (
+              <p style={{ fontSize: 12.5, color: "var(--ink-3)", margin: "7px 0 0" }}>
+                New name: they will be added to your team.
+              </p>
+            )}
           </div>
 
-          <p style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 16 }}>
-            Marking a call won or lost lets Salix attribute win-rate lift to the
-            plays it finds, and keeps lost-deal objections out of the coaching
-            evidence pool. Pick the language the call was actually in — say{" "}
-            <b>Urdu</b> for an Urdu call rather than <em>both</em>, which
-            transcribes it into a script the measurements cannot read.
-          </p>
+          {/* Everything here has a sensible default. Outcome is the one worth
+              giving: only won calls become evidence in colleagues' coaching. */}
+          <details style={{ marginBottom: 20 }}>
+            <summary style={{ fontSize: 13, color: "var(--ink-2)", cursor: "pointer" }}>
+              More details (optional)
+            </summary>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+                gap: 14,
+                marginTop: 12,
+              }}
+            >
+              <Field label="Call title">
+                <input name="title" className="field" placeholder="Discovery with Northwind" />
+              </Field>
+              <Field label="Account">
+                <input name="account" className="field" placeholder="Northwind Logistics" />
+              </Field>
+              <Field label="Outcome">
+                <select name="outcome" className="field" defaultValue="open">
+                  <option value="open">Still open</option>
+                  <option value="won">Won</option>
+                  <option value="lost">Lost</option>
+                </select>
+              </Field>
+            </div>
+          </details>
 
           {failure && (
             <div
@@ -339,7 +387,7 @@ export default function UploadPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={!file || submitting}
+            disabled={!file || !salesperson.trim() || submitting || outOfCredits}
           >
             {submitting ? "Uploading…" : "Start the analysis"}
             {!submitting && <IconArrow size={13} />}
@@ -383,9 +431,14 @@ export default function UploadPage() {
             >
               <div style={{ display: "flex", gap: 9, alignItems: "center", marginBottom: 6 }}>
                 <IconWarning size={14} style={{ color: "var(--rose)" }} />
-                <strong style={{ fontSize: 14 }}>Transcription failed</strong>
+                <strong style={{ fontSize: 14 }}>The analysis failed</strong>
               </div>
               <p style={{ margin: 0, fontSize: 13, color: "var(--ink-2)" }}>{failure}</p>
+              {billing?.enforced && (
+                <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--ink-3)" }}>
+                  Your credit has been returned.
+                </p>
+              )}
             </div>
           )}
 
@@ -404,13 +457,21 @@ export default function UploadPage() {
             >
               <IconCheck size={20} style={{ color: "var(--willow)" }} />
               <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ fontSize: 15, fontWeight: 500 }}>Analysis complete</div>
+                <div style={{ fontSize: 15, fontWeight: 500 }}>
+                  {degraded.length ? "Finished, with gaps" : "Analysis complete"}
+                </div>
                 {done?.detail && (
                   <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>
                     {done.detail}
+                    {degraded.length > 0 && ` · could not finish: ${degraded.join(", ")}`}
                   </div>
                 )}
               </div>
+              {repId && events.get("coach")?.status === "ok" && (
+                <Link href={`/reps/${repId}`} className="btn">
+                  See the coaching plan
+                </Link>
+              )}
               <button
                 className="btn btn-primary"
                 onClick={() => router.push(`/calls/${callId}`)}

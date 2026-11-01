@@ -39,7 +39,8 @@ def build_providers(settings: Settings | None = None) -> Providers:
 
     if llm_live or native_live or settings.asr_is_live:
         # Imported lazily so that offline mode never pays for the SDK import.
-        from .dashscope_llm import DashScopeEmbeddings, DashScopeLLM
+        from .dashscope_llm import DashScopeEmbeddings
+        from .failover import build_llm
         from .dashscope_tts import DashScopeTTS
 
         def _asr():
@@ -69,7 +70,7 @@ def build_providers(settings: Settings | None = None) -> Providers:
             "LIVE" if native_live else "MOCK",
         )
         return Providers(
-            llm=DashScopeLLM(settings) if llm_live else MockLLM(settings),
+            llm=build_llm(settings) if llm_live else MockLLM(settings),
             asr=_asr(),
             tts=DashScopeTTS(settings) if native_live else MockTTS(settings),
             embeddings=(

@@ -76,6 +76,11 @@ async function proxy(request: Request, path: string[]): Promise<Response> {
     headers: forwardHeaders(request, clientId),
     // Never follow a redirect on the API's behalf; the client decides.
     redirect: "manual",
+    // The cookie is forwarded by hand above. Left on its default, fetch handles a 401
+    // to a request with a streamed body itself, and fails with "expected non-null body
+    // source": every POST from a signed-out browser became a 502 "API unreachable",
+    // and a session expiring mid-upload never reached the login page.
+    credentials: "omit",
   };
 
   if (request.method !== "GET" && request.method !== "HEAD") {

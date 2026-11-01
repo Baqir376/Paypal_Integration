@@ -144,34 +144,58 @@ OBJECTION_CUES: dict[str, tuple[str, ...]] = {
         "more than we were expecting", "cannot afford", "out of our budget",
         "price is high", "that price", "half of it for", "not a small decision",
         "is a lot for", "well beyond",
+        # Roman Urdu
+        "budget se kaafi upar", "budget se zyada", "price bohat zyada", "qeemat zyada",
+        "mehnga hai", "mehanga", "itna soncha nahi", "itna socha nahi", "kharcha zyada",
+        # Urdu script
+        "بجٹ سے کافی اوپر", "بجٹ سے زیادہ", "قیمت بہت زیادہ", "مہنگا ہے", "مہنگی ہے",
+        "اتنا سوچا نہیں تھا", "خرچہ زیادہ", "رقم بہت زیادہ",
     ),
     "timing": (
         "next quarter", "not right now", "not the right time", "busiest period",
         "until the end of march", "no headcount", "hiring freeze",
         "guarantee it fails",
+        # Roman Urdu & Urdu
+        "agle quarter", "abhi waqt nahi", "masroof hain", "اگلے کوارٹر", "ابھی وقت نہیں",
     ),
     "authority": (
         "my boss", "sign it off", "sign off", "would need approval",
         "goes to our", "controls the budget", "board asked", "my finance director",
         "would need to check with",
+        # Roman Urdu & Urdu
+        "leadership ko", "approve karwaun", "boss se poochna", "manzoori",
+        "لیڈرشپ کو", "منظوری", "اپروول", "ڈائریکٹر سے",
     ),
     "competition": (
         "we already use", "we currently use", "mostly works", "not unhappy",
         "does that too", "the other vendor", "incumbent",
+        # Roman Urdu & Urdu
+        "pehle se use kar rahe", "doosra vendor", "پہلے سے استعمال",
     ),
     "status_quo": (
         "fine as is", "works well enough", "no appetite", "stay where we are",
         "not really a process", "nobody has ever", "would resist",
         "nothing catastrophic",
+        # Roman Urdu
+        "theek chal raha hai", "ab tak theek", "manual hi hai", "purane tareeqe",
+        "spreadsheet mein", "koi masla nahi tha",
+        # Urdu script
+        "ٹھیک چل رہا ہے", "اب تک ٹھیک", "مینول ہی ہے", "پرانے طریقے", "اسپریڈ شیٹ",
     ),
     "trust": (
         "how do we know", "would want proof", "i am sceptical", "i get sceptical",
         "sold to me", "bought two", "platform number three", "confidently told us",
+        # Roman Urdu & Urdu
+        "pehle bhi sun chuka", "bach kar rehta", "pichli dafa wali kahani", "extra kaam",
+        "پہلے بھی سن چکا", "بچ کر رہتا", "پچھلی دفعہ والی کہانی", "اضافی کام",
     ),
     "risk": (
         "migration", "three years of history", "not searchable", "would evaporate",
         "data is clean enough", "run aground", "single point of failure",
         "if she left", "worries me",
+        # Roman Urdu & Urdu
+        "setup teen hafte", "data connect", "mushkil thi", "data teen alag",
+        "تین ہفتے لگ گئے", "مشکل تھی", "ڈیٹا کنیکٹ",
     ),
     "fit": (
         "built for someone", "our size", "not sure it is aimed at us",
@@ -183,6 +207,10 @@ NEXT_STEP_CUES = (
     "next step", "follow up", "send you", "schedule", "calendar", "let us",
     "i will", "we will", "book", "meet again", "circle back", "monday",
     "tuesday", "wednesday", "thursday", "friday", "next week",
+    # Roman Urdu
+    "agla step", "agle hafte", "tafseel bhej", "email kar", "call kar", "mangal",
+    # Urdu script
+    "اگلے ہفتے", "تفصیل بھیج", "رابطہ کریں", "ای میل", "منگل", "میٹنگ",
 )
 
 # The buyer agreeing is what makes a next step mutual rather than a promise the
@@ -191,11 +219,16 @@ AGREEMENT_CUES = (
     "that works", "works for me", "let us do that", "yes", "sounds good",
     "i will take it", "send it", "send them", "put something in", "book it",
     "that would be helpful", "i would like that", "we will find some time",
+    # Roman Urdu
+    "theek hai", "bhej dein", "main dekh kar", "chalega", "sahi hai", "bilkul theek",
+    # Urdu script
+    "ٹھیک ہے", "بھیج دیں", "میں دیکھ لوں گا", "صحیح ہے", "بالکل ٹھیک", "مناسب ہے",
 )
 
 DATE_RE = re.compile(
-    r"\b(mon|tues|wednes|thurs|fri)day\b|\bnext week\b"
-    r"|\bthe (fourth|twelfth|eighteenth)\b|\bthis (afternoon|week)\b",
+    r"\b(mon|tues|wednes|thurs|fri)day\b|\bnext week\b|\bagle hafte\b|\bmangal\b"
+    r"|\bthe (fourth|twelfth|eighteenth)\b|\bthis (afternoon|week)\b"
+    r"|اگلے ہفتے|منگل",
     re.IGNORECASE,
 )
 
@@ -206,6 +239,7 @@ PLAY_MARKERS: dict[str, tuple[str, ...]] = {
     "story_arc": (
         "can i tell you about", "one of our customers", "a team that",
         "a freight business", "a distribution business", "had almost exactly",
+        "aap ke jaise teen customers", "ایک مثال", "ایک کمپنی جس",
     ),
     "analogy": (
         "behaves much more like", "more like a", "think of it as",
@@ -214,13 +248,16 @@ PLAY_MARKERS: dict[str, tuple[str, ...]] = {
     "reframe": (
         "compared to what", "the way i would frame it", "let me be careful",
         "the way i would put it", "part of what you are buying",
+        "kharcha nahi ek trade", "نہ کہ محض خرچہ",
     ),
     "proof_point": (
         "went from", "measured it", "before and after", "percent inside",
+        "gyarah din chhota", "retention chaar se paanch percent", "گیارہ دن", "چار سے پانچ فیصد",
     ),
     "objection_turn": (
         "and you should push back", "i would rather lose this",
         "i would rather hear", "i am not going to pretend",
+        "un dono par kaam kar ke", "ان دونوں پر کام",
     ),
 }
 
@@ -265,6 +302,7 @@ CONCESSION_CUES = (
     "that would be helpful", "good point", "that works", "i agree",
     "uncomfortably accurate", "annoyingly fair", "that is a good", "no argument",
     "you are right", "i will take it", "genuinely helpful", "that is more careful",
+    "wajib baat", "jaiz baat", "sahi keh rahe", "مناسب ہے", "درست بات",
 )
 
 
@@ -306,6 +344,65 @@ BUYER: That is more careful than what we saw. What does it cost to find out whet
 REP: Configure a transcription provider that does diarization and this stand-in disappears. You would be looking at your own recordings within the hour. That is the honest answer to what it costs to evaluate.
 BUYER: Alright. Send me what I need to set it up and I will look at it properly this week.
 REP: I will put it in an email this afternoon.
+"""
+
+STAND_IN_CALL_ENGLISH = STAND_IN_CALL
+
+STAND_IN_CALL_ROMAN_URDU = """\
+REP: Assalam-o-alaikum, Bilal sahab. Waqt dene ka shukriya. Main aap ka zyada waqt nahi loonga.
+BUYER: Walaikum assalam. Haan boliye, mere paas taqreeban bees minute hain.
+REP: Kuch bechne se pehle main sirf yeh samajhna chahta hoon ke abhi aap ka renewal process kaise chalta hai?
+BUYER: Dekhein, zyada tar kaam manual hi hai. Team ek spreadsheet mein dates rakhti hai, aur hum expiry se ek mahina pehle client ko call kar lete hain. Ab tak theek chal raha hai.
+REP: Theek hai. Aur reporting mein team ka hafte mein kitna waqt jata hai?
+BUYER: Maine kabhi count nahi kiya. Chhe se aath ghante lag hi jate hain, kyunke data teen alag systems mein para hai aur wo aapas mein baat nahi karte. Kaam thakane wala hai lekin accurate hai.
+REP: To mahine ke taqreeban tees ghante. Agar wo waqt team ko wapas mil jaye, to wo us se kya karti?
+BUYER: Shayad pipeline ka thora gehra analysis. Jo strategic kaam hum har quarter agle quarter par daal dete hain. Lekin dekhein, yeh baat main pehle bhi sun chuka hoon. Team ka waqt bachao har vendor yehi kehta hai.
+REP: Samajh sakta hoon. Aap ne pehle koi aisa tool try kiya tha?
+BUYER: Do saal pehle ek liya tha. Chhe mahine baad koi use hi nahi kar raha tha. Implementation itni lambi thi ke team wapas apne purane tareeqe par chali gayi. Us ke baad se main aise vendors se thora bach kar rehta hoon.
+REP: Wo jaiz hai. Us waqt sab se zyada mushkil kya thi — setup, ya baad mein team ka use karna?
+BUYER: Setup. Teen hafte lag gaye the sirf data connect karne mein, aur us dauran normal kaam bhi chalta raha. Meri team pehle hi thak chuki thi.
+REP: Achha. Ab price ki baat karte hain, kyunke wo waise bhi aayegi.
+BUYER: Haan, aur sach batayein to jo quote maine dekha hai wo hamare budget se kaafi upar hai. Aisi tool ke liye hum ne itna soncha nahi tha.
+REP: Agar mahine ke tees ghante bach rahe hain, to yeh kharcha nahi ek trade hai. Aap ki leadership ke liye kaun sa number sab se zyada maayne rakhta hai?
+BUYER: Revenue retention, aur sales cycle ki speed. Sirf ghante bachane se yeh dono behtar nahi hote. Agar main yeh budget approve karwaun, to mujhe apni leadership ko in dono par asar dikhana parega. Ghante bachana un ke liye argument nahi hai.
+REP: Theek hai. Main ek chhota pilot tajweez karta hoon — sirf reporting par, teen hafte. Agar waqt nahi bacha to hum aage nahi barhte.
+BUYER: Pilot bhi meri team ke liye extra kaam hai. Aur teen hafte ka matlab hai koi banda us par lagana. Mujhe pehle yeh samajhna hoga ke us dauran aap hum se kya expect kar rahe hain, warna yeh pichli dafa wali kahani ho jayegi.
+REP: Wajib baat hai. Main aap ko is hafte tafseel bhej deta hoon. Agle hafte mangal ko baat kar sakte hain?
+BUYER: Theek hai, bhej dein. Mangal ko main dekh kar batata hoon.
+"""
+
+STAND_IN_CALL_URDU = """\
+REP: السلام علیکم بلال صاحب، وقت دینے کا شکریہ۔ میں آپ کا زیادہ وقت نہیں لوں گا۔
+BUYER: وعلیکم السلام، جی فرمائیے، میرے پاس تقریباً بیس منٹ ہیں۔
+REP: کچھ تجویز کرنے سے پہلے میں یہ سمجھنا چاہتا ہوں کہ ابھی آپ کی کمپنی میں معاہدوں کی تجدید کا عمل کیسے چلتا ہے؟
+BUYER: دیکھیں، زیادہ تر کام مینول ہی ہے۔ ہماری ٹیم ایک اسپریڈ شیٹ میں تاریخیں رکھتی ہے، اور ہم میعاد ختم ہونے سے ایک مہینہ پہلے کلائنٹ سے رابطہ کرتے ہیں۔ اب تک ٹھیک چل رہا ہے۔
+REP: درست ہے۔ اور اس رپورٹنگ میں ٹیم کا ہفتے میں کتنا وقت خرچ ہوتا ہے؟
+BUYER: میں نے کبھی گنتی نہیں کی، لیکن چھ سے آٹھ گھنٹے لگ ہی جاتے ہیں کیونکہ ڈیٹا تین الگ سسٹمز میں ہے جو آپس میں منسلک نہیں۔ کام تھکا دینے والا ہے لیکن درست ہے۔
+REP: یعنی مہینے کے تقریباً تیس گھنٹے۔ اگر یہ وقت ٹیم کو واپس مل جائے تو وہ اس کا کیا استعمال کرے گی؟
+BUYER: شاید پائپ لائن کا گہرا تجزیہ۔ لیکن دیکھیں، یہ بات میں پہلے بھی سن چکا ہوں۔ ہر وینڈر یہی کہتا ہے کہ ٹیم کا وقت بچائیں۔
+REP: میں آپ کی بات سمجھ سکتا ہوں۔ کیا آپ نے پہلے کبھی کوئی ایسا ٹول آزمایا تھا؟
+BUYER: دو سال پہلے ایک ٹول لیا تھا، چھ ماہ بعد کوئی استعمال ہی نہیں کر رہا تھا۔ اس کی امپلیمنٹیشن اتنی لمبی تھی کہ ٹیم واپس پرانے طریقے پر چلی گئی۔ اس کے بعد سے ہم محتاط رہتے ہیں۔
+REP: بالکل جائز بات ہے۔ اور بجٹ کے حوالے سے آپ کی کیا رائے ہے؟
+BUYER: سچ کہوں تو جو کوٹیشن ہم نے دیکھی ہے وہ ہمارے منظور شدہ بجٹ سے کافی اوپر ہے۔ اس نوعیت کے ٹول کے لیے ہم نے اتنی رقم نہیں رکھی تھی۔
+REP: اگر مہینے کے تیس گھنٹے بچیں اور ڈیل سائیکل تیز ہو، تو آپ کی لیڈرشپ کے لیے سب سے اہم میٹرک کیا ہوگا؟
+BUYER: ریونیو ریٹینشن اور سیلز کی رفتار۔ اگر میں بورڈ سے بجٹ کی منظوری لوں تو مجھے ان دونوں پر واضح اثر دکھانا ہوگا۔
+REP: بالکل متفق ہوں۔ کیا ہم اگلے ہفتے منگل کو آپ کی فنانس ٹیم کے ساتھ بیس منٹ کی میٹنگ طے کر سکتے ہیں تاکہ میں ماڈل پیش کر سکوں؟
+BUYER: منگل کا دن مناسب ہے۔ آپ تفصیلات بھیج دیں، میں دیکھ لوں گا۔
+REP: بہت شکریہ بلال صاحب، میں آج ہی ای میل بھیج دیتا ہوں۔
+"""
+
+STAND_IN_CALL_BILINGUAL = """\
+REP: Assalam-o-alaikum Bilal sahab, thanks for taking the time today. Main aap ka zyada time nahi loonga.
+BUYER: Walaikum assalam. Yes please go ahead, I have around twenty minutes before my next meeting.
+REP: Before discussing the tool, I want to understand aap ka current renewal process kaise chalta hai?
+BUYER: Honestly, mostly manual spreadsheet par depend karta hai. Operations team expiry dates track karti hai aur client ko outreach karti hai. So far it has worked fine.
+REP: Understood. Weekly basis par is reporting mein team ka kitna time lag jata hai?
+BUYER: Six to eight hours per week easily, because CRM aur billing systems aapas mein sync nahi hain.
+REP: So roughly thirty hours every month. If we automate this, what is the biggest impact for your management?
+BUYER: Pricing is the main hurdle. Jo quote humein mila hai that is beyond our approved budget for this quarter.
+REP: Agar ye thirty hours per month save kare aur churn rate reduce kare, can we schedule a quick call next Tuesday with your finance team?
+BUYER: Tuesday works for me. Please send the meeting invite and details.
+REP: Thank you Bilal sahab, invite bhej raha hoon.
 """
 
 
@@ -367,6 +464,15 @@ class MockLLM:
     ) -> AsyncIterator[str]:
         # A plausible buyer turn for the Dojo, so the loop is exercisable
         # offline. Deterministic on the rep utterance.
+        # A closing test: the buyer agrees when, and only when, it is asked to.
+        if "WHAT IT TAKES TO WIN YOU OVER" in system and re.search(
+            r"(?i)(book|schedule|next step).*(monday|tuesday|wednesday|thursday|friday|tomorrow|next week)",
+            user,
+            re.IGNORECASE,
+        ):
+            for token in "Yes, that works for me. I will bring our finance lead.".split(" "):
+                yield token + " "
+            return
         rng = self._rng("stream", user[-300:])
         replies = [
             "That is fair, but I still need to understand what this costs us.",
@@ -710,6 +816,36 @@ class MockLLM:
 
         return PlayHarvest(plays=candidates[:4])
 
+    def _build_ClosingVerdict(self, user: str, rng: random.Random):
+        """Judge from the transcript, quoting it, as the model is told to."""
+        from ..schemas.common import SkillAxis
+        from ..schemas.dojo import ClosingVerdict, GapVerdict
+
+        skills, _, rest = user.partition("TRANSCRIPT")
+        lines = [line.split(": ", 1) for line in rest.splitlines() if ": " in line]
+        reps = [text for who, text in lines if who == "SALESPERSON"]
+        buyers = [text for who, text in lines if who == "BUYER"]
+
+        agreed = next((b for b in reversed(buyers) if b.strip().lower().startswith("yes, that works")), "")
+        question = next((r for r in reps if r.strip().endswith("?")), "")
+        gaps = [
+            GapVerdict(
+                axis=SkillAxis(axis),
+                passed=bool(question),
+                evidence=question,
+                feedback="You asked." if question else "You never asked the buyer anything.",
+            )
+            for axis in re.findall(r"^- ([a-z_]+):", skills.split("WHAT SUCCESS")[0], re.MULTILINE)
+            if axis in SkillAxis._value2member_map_
+        ]
+        return ClosingVerdict(
+            deal_closed=bool(agreed),
+            close_evidence=agreed.strip(),
+            gaps=gaps,
+            next_focus="Ask for a dated next step." if not agreed else "Keep doing this on real calls.",
+            summary="Offline reading of the session: based on questions and agreement only.",
+        )
+
     def _build_CoachingPlan(self, user: str, rng: random.Random):
         """Assemble a plan from the retrieved evidence in the prompt.
 
@@ -926,25 +1062,39 @@ class MockASR:
     ) -> ASRResult:
         from pathlib import Path
 
-        # A script beside the audio wins: that is how the seed corpus feeds
+        # 1. A script beside the audio wins: that is how the seed corpus feeds
         # real dialogue through the pipeline without a key.
-        script = Path(audio_url).with_suffix(".txt")
-        if script.exists():
-            return self.from_script(script.read_text(encoding="utf-8"))
+        p = Path(audio_url)
+        for ext in (".txt", ".md"):
+            script = p.with_suffix(ext)
+            if script.exists():
+                return self.from_script(script.read_text(encoding="utf-8"))
 
-        # Otherwise this is a genuine upload with no key configured. Rather
-        # than fail -- which would leave a judge staring at a red stage on the
-        # ingest screen -- synthesize a stand-in conversation so the whole DAG
-        # still runs and the call page is populated. The transcript says
-        # plainly what it is.
-        log.warning(
-            "offline transcription: no script beside %s, using the stand-in "
-            "conversation. The uploaded audio was stored and NOT transcribed. "
-            "Set DASHSCOPE_API_KEY, or another provider with diarization, to "
-            "analyse real recordings.",
-            audio_url,
-        )
-        return self.from_script(STAND_IN_CALL)
+        # 2. Check if a known sample in storage/samples or repository root matches by filename
+        repo_root = Path(__file__).resolve().parent.parent.parent.parent
+        samples_dir = repo_root / "storage" / "samples"
+        if samples_dir.exists():
+            for ext in (".txt", ".md"):
+                candidate = samples_dir / f"{p.stem}{ext}"
+                if candidate.exists():
+                    return self.from_script(candidate.read_text(encoding="utf-8"))
+
+        # 3. Multilingual selection based on language_hints
+        chosen = STAND_IN_CALL
+        hint = (language_hints[0] if language_hints else "").lower().strip()
+        if hint == "ur":
+            chosen = STAND_IN_CALL_URDU
+            log.info("offline transcription: selected Urdu (Nastaliq) sales dialogue")
+        elif hint in {"ur-roman", "roman"}:
+            chosen = STAND_IN_CALL_ROMAN_URDU
+            log.info("offline transcription: selected Roman Urdu sales dialogue")
+        elif hint in {"multi", "both"}:
+            chosen = STAND_IN_CALL_BILINGUAL
+            log.info("offline transcription: selected Bilingual English/Urdu sales dialogue")
+        else:
+            log.info("offline transcription: selected English stand-in dialogue")
+
+        return self.from_script(chosen)
 
     @classmethod
     def from_script(cls, script: str) -> ASRResult:
@@ -957,11 +1107,18 @@ class MockASR:
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
-            match = re.match(r"^([A-Za-z][\w .'-]*):\s*(.+)$", line)
-            if not match:
+            clean_line = line.replace("**", "").replace("*", "").strip()
+            if ":" not in clean_line:
                 continue
-            speaker, text = match.group(1).strip(), match.group(2).strip()
-            speaker_id = 0 if speaker.upper().startswith("REP") else 1
+            speaker, _, text = clean_line.partition(":")
+            speaker = speaker.strip()
+            text = text.strip()
+            if not speaker or not text:
+                continue
+
+            spk_upper = speaker.upper()
+            is_rep = any(spk_upper.startswith(k) for k in ("REP", "A", "SELLER", "SALES", "0", "سیلز", "نمائندہ"))
+            speaker_id = 0 if is_rep else 1
 
             words = len(text.split())
             spoken_ms = int(words / cls.WORDS_PER_MINUTE * 60_000)

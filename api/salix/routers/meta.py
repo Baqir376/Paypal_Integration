@@ -39,7 +39,8 @@ async def health(session: Session, providers: Prov) -> Health:
     org = await repo.first_org(session)
 
     calls = plays = moments = 0
-    if org is not None:
+    # Public, so with accounts on it says nothing about anybody's data.
+    if org is not None and not settings.auth_required:
         calls = len(await repo.list_calls(session, org.id, limit=1000))
         plays = len(await repo.list_plays(session, org.id))
         moments = await repo.count_moments(session, org.id)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -12,16 +13,19 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
+from ..billing import credits
 from ..config import get_settings
 from ..schemas.analysis import CallAnalysis
 from ..schemas.call import Call, CallStatus, Transcript
 from ..schemas.common import CallOutcome, SalixModel
 from ..schemas.metrics import CallMetrics, Scorecard
+from ..providers.mock import MockASR
 from ..providers.storage import build_storage
 from ..pipeline.bus import bus
 from ..pipeline.orchestrator import run_in_background
-from ..store import repo
-from .deps import OrgId, Prov, Session
+from ..store import repo, session_scope
+from .deps import OrgId, Prov, Session, is_restricted_member, owned
+from .reps import resolve_salesperson
 
 log = logging.getLogger("salix.routers.calls")
 
@@ -36,6 +40,34 @@ ALLOWED_SUFFIXES = {
 #: request so an operator can lower it without a code change; this constant is
 #: what applies when nothing is configured.
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+
+
+#: Used when nobody says. An upload needs a file and a name and nothing else.
+UNSPECIFIED_ACCOUNT = "Unspecified account"
+
+NO_CREDITS = "You are out of credits. Each recording uses one; buy more to continue."
+
+
+def _default_title(typed: str, rep_name: str) -> str:
+    """Their words if they called it something, otherwise "Bilal's call"."""
+    if re.search(r"\bcall$", typed.strip(), re.IGNORECASE):
+        return typed.strip()
+    return f"{rep_name.split()[0]}'s call"
+
+
+def _attach_sample_script(settings, filename: str, call_id: str) -> None:
+    """Offline only: a bundled sample keeps its real dialogue.
+
+    The twin cannot listen, so it reads a script beside the audio. The stored file
+    is named after the call and not the sample, so the script is put there for it.
+    The name is held to a strict pattern before it goes anywhere near a path.
+    """
+    stem = filename.rsplit(".", 1)[0]
+    if not re.fullmatch(r"[\w-]{1,80}", stem):
+        return
+    script = settings.storage_dir / "samples" / f"{stem}.txt"
+    if script.is_file():
+        (settings.audio_dir / f"{call_id}.txt").write_bytes(script.read_bytes())
 
 
 class CallSummary(SalixModel):
@@ -108,9 +140,7 @@ async def list_calls(
 
 @router.get("/{call_id}", response_model=CallDetailResponse)
 async def get_call(session: Session, org_id: OrgId, call_id: str) -> CallDetailResponse:
-    call = await repo.get_call(session, call_id)
-    if call is None:
-        raise HTTPException(status_code=404, detail=f"No call {call_id}")
+    call = owned(await repo.get_call(session, call_id), org_id, "call", call_id)
 
     transcript = await repo.get_artifact(session, call_id, repo.TRANSCRIPT, Transcript)
     metrics = await repo.get_artifact(session, call_id, repo.METRICS, CallMetrics)
@@ -158,16 +188,17 @@ async def upload_call(
     providers: Prov,
     background: BackgroundTasks,
     file: UploadFile,
-    title: str = Form(...),
-    account: str = Form(...),
-    rep_id: str = Form(...),
+    # All a person has to give: "Bilal" or "Bilal's Call". Someone new is added
+    # to the team. `rep_id` is for callers who already know exactly who it is.
+    salesperson: str = Form(""),
+    rep_id: str = Form(""),
+    title: str = Form(""),
+    account: str = Form(""),
     deal_id: str = Form(""),
     outcome: str = Form("open"),
     rep_speaker_id: str = Form(""),
-    # "en", "ur", or empty for a call that moves between them. The uploader
-    # picks it, because nothing else can: an Urdu recording asked for as
-    # English comes back as fluent nonsense, and asked for as multilingual
-    # comes back in Devanagari, which this codebase reads as English.
+    # Detected from the recording. Only for API callers who know better; nothing
+    # in the product sends it.
     language: str = Form(""),
 ) -> dict:
     """Accept a recording and start the analysis DAG.
@@ -200,9 +231,27 @@ async def upload_call(
             ),
         )
 
-    rep = await repo.get_rep(session, rep_id)
-    if rep is None:
-        raise HTTPException(status_code=400, detail=f"No rep {rep_id}")
+    if deal_id and (
+        (deal := await repo.get_deal(session, deal_id)) is None or deal.org_id != org_id
+    ):
+        raise HTTPException(status_code=400, detail=f"No deal {deal_id}")
+
+    if not rep_id.strip() and not salesperson.strip():
+        raise HTTPException(status_code=422, detail="Say whose call this is.")
+
+    # Before a byte is read, for the same reason as the size check above. The
+    # charge itself comes later and is what actually decides.
+    if settings.billing_enforced and await credits.balance(session, org_id) < credits.CALL_COST:
+        raise HTTPException(status_code=402, detail=NO_CREDITS)
+
+    if rep_id.strip():
+        rep = await repo.get_rep(session, rep_id)
+        if rep is None or rep.archived or rep.org_id != org_id:
+            raise HTTPException(status_code=400, detail=f"No rep {rep_id}")
+    else:
+        rep = await resolve_salesperson(
+            session, org_id, salesperson, may_change_team=not is_restricted_member(request)
+        )
 
     call_id = f"call_{uuid.uuid4().hex[:12]}"
     filename = f"{call_id}{suffix}"
@@ -221,6 +270,14 @@ async def upload_call(
     if written == 0:
         raise HTTPException(status_code=400, detail="Uploaded file was empty")
 
+    # In this transaction, with the call row: anything failing below takes the
+    # charge back with it.
+    if settings.billing_enforced:
+        try:
+            await credits.spend_for_call(session, org_id, call_id)
+        except credits.InsufficientCredits:
+            raise HTTPException(status_code=402, detail=NO_CREDITS)
+
     # The storage backend decides whether the transcriber gets a local path
     # (offline mode) or a reachable URL (OSS, or a configured public host).
     storage = build_storage(settings)
@@ -236,13 +293,16 @@ async def upload_call(
             stored_at,
         )
 
+    if isinstance(providers.asr, MockASR):
+        _attach_sample_script(settings, file.filename or "", call_id)
+
     call = Call(
         id=call_id,
         org_id=org_id,
         deal_id=deal_id or None,
-        rep_id=rep_id,
-        title=title,
-        account=account,
+        rep_id=rep.id,
+        title=title.strip() or _default_title(salesperson, rep.name),
+        account=account.strip() or UNSPECIFIED_ACCOUNT,
         occurred_at=datetime.now(timezone.utc),
         audio_url=audio_url,
         status=CallStatus.TRANSCRIBING,
@@ -258,7 +318,7 @@ async def upload_call(
         audio_url=audio_url,
         rep_speaker_id=int(rep_speaker_id) if rep_speaker_id.strip().isdigit() else None,
         rep_name=rep.name,
-        language=language.strip().lower() if language.strip().lower() in {"en", "ur"} else "",
+        language=language.strip().lower() if language.strip().lower() in {"en", "ur", "ur-roman", "multi"} else "",
     )
 
     log.info("accepted upload %s (%.1f MB) for %s", call_id, written / 1e6, rep.name)
@@ -266,17 +326,28 @@ async def upload_call(
         "call_id": call_id,
         "status": "accepted",
         "bytes": written,
+        "rep_id": rep.id,
         "events_url": f"/api/calls/{call_id}/events",
     }
 
 
+async def _ensure_owned(request: Request, call_id: str) -> None:
+    """For the streams below, which outlive any request-scoped database session."""
+    if not get_settings().auth_required:
+        return
+    async with session_scope() as session:
+        call = await repo.get_call(session, call_id)
+    owned(call, request.state.auth.org_id, "call", call_id)
+
+
 @router.get("/{call_id}/events")
-async def stream_events(call_id: str) -> StreamingResponse:
+async def stream_events(request: Request, call_id: str) -> StreamingResponse:
     """Server-sent events for one call's pipeline run.
 
     A heartbeat comment goes out every fifteen seconds so that proxies and
     browsers do not quietly close a stream during a long transcription.
     """
+    await _ensure_owned(request, call_id)
 
     async def generate():
         try:
@@ -309,6 +380,7 @@ async def stream_events(call_id: str) -> StreamingResponse:
 
 
 @router.get("/{call_id}/timeline")
-async def stage_history(call_id: str) -> list[dict]:
+async def stage_history(request: Request, call_id: str) -> list[dict]:
     """Whatever the pipeline has already reported, for a page reload."""
+    await _ensure_owned(request, call_id)
     return [e.model_dump(mode="json") for e in bus.history(call_id)]

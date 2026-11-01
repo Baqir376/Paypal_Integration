@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from pydantic import Field
 
+from ..dojo.closing import MODE, ClosingJudge
 from ..dojo.engine import DojoEngine
 from ..dojo.persona import build_persona
 from ..providers.base import ProviderError
@@ -29,8 +30,8 @@ from ..providers.edge_voice import MAX_CHARS as MAX_SPOKEN_CHARS
 from ..providers.edge_voice import EdgeTTS
 from ..schemas.common import SalixModel
 from ..schemas.dojo import DojoSession
-from ..store import repo
-from .deps import OrgId, Prov, Session
+from ..store import repo, session_scope
+from .deps import OrgId, Prov, Session, owned
 
 log = logging.getLogger("salix.routers.dojo")
 
@@ -59,14 +60,37 @@ class EndRequest(SalixModel):
     session: DojoSession
 
 
+async def authoritative(session, org_id: str, sent: DojoSession) -> DojoSession:
+    """The session as the server holds it, whatever the browser sent.
+
+    The browser's copy is for display. Taking its turns, its buyer instructions or
+    its mode at face value would let anybody write a transcript that passes a closing
+    test, so what it sent is only used to find the record.
+
+    A session with no record can only be old-style practice, which earns no verdict
+    and proves nothing, and a closing test always has one, because the server issues
+    them. An id from another team answers as if it does not exist.
+    """
+    owned(await repo.get_rep(session, sent.rep_id), org_id, "rep", sent.rep_id)
+    if not await repo.dojo_session_is_ours(session, sent.id, org_id):
+        raise HTTPException(status_code=404, detail=f"No session {sent.id}")
+
+    stored = await repo.get_dojo_session(session, sent.id)
+    if stored is None:
+        if sent.mode != "practice":
+            raise HTTPException(status_code=404, detail=f"No session {sent.id}")
+        return sent.model_copy(deep=True)
+    if stored.mode == MODE and stored.ended_at:
+        raise HTTPException(status_code=409, detail="This test is finished. Start a new one to try again.")
+    return stored
+
+
 @router.post("/start")
 async def start_session(
     session: Session, org_id: OrgId, providers: Prov, body: StartRequest
 ) -> dict:
     """Build the persona from this rep's own failures and open a session."""
-    rep = await repo.get_rep(session, body.rep_id)
-    if rep is None:
-        raise HTTPException(status_code=404, detail=f"No rep {body.rep_id}")
+    rep = owned(await repo.get_rep(session, body.rep_id), org_id, "rep", body.rep_id)
 
     persona = await build_persona(
         session, org_id, body.rep_id,
@@ -75,6 +99,8 @@ async def start_session(
     )
     engine = DojoEngine(providers)
     dojo = engine.start(body.rep_id, persona, body.scenario, body.language)
+    await repo.put_dojo_session(session, org_id, dojo)
+    await session.commit()
 
     # The plays this rep has been prescribed drive the live coach rail.
     plan = await repo.get_coaching_plan(session, body.rep_id)
@@ -101,6 +127,11 @@ def _opening_line(persona, language: str = "en") -> str:
     English has already been told the wrong thing about the exercise.
     """
     first = persona.name.split()[0]
+    if language == "ur":
+        return (
+            f"السلام علیکم، میں {first} بات کر رہی ہوں۔ میرے پاس تقریباً بیس منٹ "
+            "ہیں۔ آپ کس چیز پر بات کرنا چاہتے تھے؟"
+        )
     if language == "ur-roman":
         # "bol rahi", not "bol raha". Urdu verbs agree with the speaker's
         # gender, the buyer is always voiced by a woman, and the masculine
@@ -117,7 +148,9 @@ def _opening_line(persona, language: str = "en") -> str:
 
 
 @router.post("/turn")
-async def take_turn(providers: Prov, body: TurnRequest) -> StreamingResponse:
+async def take_turn(
+    session: Session, org_id: OrgId, providers: Prov, body: TurnRequest
+) -> StreamingResponse:
     """Stream the buyer's reply, then the coach nudges and updated session.
 
     The response is a single SSE stream carrying three event types so the
@@ -134,7 +167,7 @@ async def take_turn(providers: Prov, body: TurnRequest) -> StreamingResponse:
             detail="A turn needs something in it. Speak or type before sending.",
         )
 
-    dojo = body.session.model_copy(deep=True)
+    dojo = await authoritative(session, org_id, body.session)
     engine = DojoEngine(providers)
 
     engine.record_turn(dojo, "rep", body.text, body.start_ms, body.end_ms)
@@ -182,6 +215,10 @@ async def take_turn(providers: Prov, body: TurnRequest) -> StreamingResponse:
         if reply:
             engine.record_turn(dojo, "buyer", reply)
 
+        # Its own transaction: the request's has ended by the time a stream finishes.
+        async with session_scope() as store:
+            await repo.put_dojo_session(store, org_id, dojo)
+
         for nudge in engine.nudges_for(dojo):
             yield f"event: nudge\ndata: {json.dumps(nudge.model_dump(mode='json'))}\n\n"
 
@@ -204,12 +241,20 @@ async def end_session(
     """Score the session on the same engine that scores real calls."""
     from datetime import datetime, timezone
 
-    dojo = body.session.model_copy(deep=True)
+    dojo = await authoritative(session, org_id, body.session)
     engine = DojoEngine(providers)
 
     plays = [p.model_dump(mode="json") for p in await repo.list_plays(session, org_id)]
     dojo.score = engine.score(dojo, plays)
     dojo.ended_at = datetime.now(timezone.utc).isoformat()
+
+    if dojo.mode == MODE:
+        # The plan this test was started on, even if a newer one has been written.
+        plan = await repo.get_coaching_plan_by_id(session, dojo.plan_id or "")
+        if plan is not None:
+            dojo.assessment = await ClosingJudge(providers).assess(
+                dojo, plan, dict(dojo.score.axes)
+            )
 
     await repo.put_dojo_session(session, org_id, dojo)
     await session.commit()

@@ -45,15 +45,20 @@ from .common import (
 from .deal import Deal, DealTrajectory, Risk, TrajectoryPoint
 from .dojo import (
     BuyerPersona,
+    ClosingAssessment,
+    ClosingVerdict,
     CoachNudge,
     DojoScore,
     DojoSession,
     DojoTurn,
+    GapResult,
+    GapVerdict,
     PersonaObjection,
 )
 from .metrics import (
     AxisScore,
     CallMetrics,
+    DealScore,
     Interruption,
     Monologue,
     Scorecard,
@@ -65,7 +70,7 @@ from .play import Play, PlayCandidate, PlayInstance
 from .report import CycleReport, Finding, Recommendation, RepRow, TeamMetrics
 
 __all__ = [
-    "AxisScore", "BuyerPersona", "BuyerSignal", "Call", "CallAnalysis", "CallDetail",
+    "AxisScore", "BuyerPersona", "ClosingAssessment", "ClosingVerdict", "DealScore", "GapResult", "GapVerdict", "BuyerSignal", "Call", "CallAnalysis", "CallDetail",
     "CallMetrics", "CallOutcome", "CallStage", "CallStatus", "Citation", "CoachNudge",
     "CoachingPlan", "Commitment", "Cycle", "CycleReport", "Deal", "DealStage",
     "DealTrajectory", "DojoScore", "DojoSession", "DojoTurn", "Drill", "Emotion",

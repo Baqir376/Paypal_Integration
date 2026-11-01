@@ -83,13 +83,24 @@ LANGUAGE_RULES: dict[str, str] = {
     ),
 }
 
+URDU_SCRIPT_RULES = (
+    "LANGUAGE\n"
+    "- Reply in Urdu script (Nastaliq). Natural spoken business Urdu.\n"
+    "- Write naturally the way a Pakistani executive speaks.\n"
+    "- Keep common English business terms (price, budget, team, system, meeting, contract) in their familiar usage.\n"
+    "- You are a woman, so use feminine agreement for yourself.\n"
+)
 
-def persona_system_prompt(persona: BuyerPersona, language: str = "en") -> str:
+
+def persona_system_prompt(persona: BuyerPersona, language: str = "en", brief: str = "") -> str:
     objections = "\n".join(
         f"- [{o.category.value}, hardness {o.hardness:.1f}] {o.text}"
         for o in persona.objections
     )
-    rules = LANGUAGE_RULES.get(language, LANGUAGE_RULES["en"])
+    if language == "ur":
+        rules = URDU_SCRIPT_RULES
+    else:
+        rules = LANGUAGE_RULES.get(language, LANGUAGE_RULES["en"])
     return f"""\
 You are {persona.name}, {persona.title} at {persona.company}. You are on a call
 with a salesperson. You are a real person having a real conversation, not an
@@ -122,6 +133,7 @@ HOW TO BEHAVE
   exercise. Never coach the rep or comment on their technique.
 - No stage directions, no asterisks, no narration. Only what you say out loud.
 
+{brief}
 {rules}
 """
 
@@ -145,7 +157,7 @@ class DojoEngine:
             persona=persona,
             # An unknown tag falls back to English rather than being passed
             # through to the prompt, where it would silently mean nothing.
-            language=language if language in LANGUAGE_RULES else "en",
+            language=language if language in (*LANGUAGE_RULES, "ur") else "en",
             scenario=scenario or f"Discovery call with {persona.name} at {persona.company}",
             started_at=datetime.now(timezone.utc).isoformat(),
             turns=[],
@@ -172,7 +184,7 @@ class DojoEngine:
         ]
 
         async for token in self.providers.llm.stream(
-            system=persona_system_prompt(session.persona, session.language),
+            system=persona_system_prompt(session.persona, session.language, session.brief),
             user=rep_text,
             history=history,
             temperature=0.75,  # a person, not a template

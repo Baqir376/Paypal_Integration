@@ -24,7 +24,7 @@ import {
   percent,
   scoreTone,
 } from "@/lib/format";
-import type { CycleReport } from "@/lib/types";
+import type { CycleReport, DealCalibration } from "@/lib/types";
 
 export default function ReportPage() {
   const [report, setReport] = useState<CycleReport | null>(null);
@@ -83,6 +83,7 @@ export default function ReportPage() {
 
   return (
     <div data-status="CYCLE REPORT" className="page" style={{ maxWidth: 900 }}>
+      <CalibrationPanel />
       <header className="page-head no-print">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
@@ -407,5 +408,42 @@ function Cell({
         <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 4 }}>{sub}</div>
       )}
     </div>
+  );
+}
+
+/**
+ * Whether the deal score predicts this team's real outcomes.
+ *
+ * Its weights were chosen by judgement, and the threshold for coaching rests on them,
+ * so the evidence for or against sits where a manager can see it.
+ */
+function CalibrationPanel() {
+  const [data, setData] = useState<DealCalibration | null>(null);
+
+  useEffect(() => {
+    api.dealCalibration().then(setData).catch(() => setData(null));
+  }, []);
+
+  if (!data) return null;
+
+  return (
+    <section className="panel no-print" style={{ padding: "14px 17px", marginBottom: 22, fontSize: 13 }}>
+      <div className="eyebrow" style={{ marginBottom: 7 }}>
+        Is the deal score right for your team?
+      </div>
+      <p style={{ margin: 0, color: data.reliable ? "var(--ink)" : "var(--ink-2)" }}>{data.verdict}</p>
+      {data.separation != null && (
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 9, fontSize: 12, color: "var(--ink-3)" }}>
+          <span className="num">{Math.round(data.separation * 100)}% separation</span>
+          {data.bands
+            .filter((band) => band.calls > 0)
+            .map((band) => (
+              <span key={band.band} className="num">
+                {band.band}: {band.won}/{band.calls} won
+              </span>
+            ))}
+        </div>
+      )}
+    </section>
   );
 }

@@ -20,6 +20,17 @@ os.environ.setdefault("SALIX_RATE_LIMIT_ENABLED", "false")
 # fresh clone has, and the auth tests supply their own.
 os.environ.pop("SALIX_API_KEY", None)
 os.environ.pop("API_KEY", None)
+# PayPal credentials switch the paywall on, and most of the suite uploads freely.
+os.environ.pop("PAYPAL_CLIENT_ID", None)
+os.environ.pop("PAYPAL_CLIENT_SECRET", None)
+os.environ.pop("SALIX_PAYPAL_CLIENT_ID", None)
+os.environ.pop("SALIX_PAYPAL_CLIENT_SECRET", None)
+os.environ.pop("SALIX_BILLING_MODE", None)
+# The same for Google and accounts: most of the suite runs with no sign-in.
+for _name in ("SALIX_BRAINTREE_MERCHANT_ID", "SALIX_BRAINTREE_PUBLIC_KEY", "SALIX_BRAINTREE_PRIVATE_KEY",
+              "SALIX_PAYPAL_SIMULATOR", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "SALIX_GOOGLE_CLIENT_ID",
+              "SALIX_GOOGLE_CLIENT_SECRET", "SALIX_AUTH_MODE", "SALIX_OWNER_EMAIL"):
+    os.environ.pop(_name, None)
 
 # The developer's own .env is not part of the test environment.
 #

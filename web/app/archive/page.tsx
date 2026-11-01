@@ -138,6 +138,14 @@ export default function ArchivePage() {
   const [health, setHealth] = useState<Health | null>(null);
 
   useEffect(() => {
+    // Outside the app shell, so it asks for itself: with accounts on, the calls
+    // and people on this page are only for somebody signed in.
+    api
+      .me()
+      .then((me) => {
+        if (me.auth_required && !me.user) window.location.assign("/login?next=/archive");
+      })
+      .catch(() => {});
     api.calls({ limit: 50 }).then(setCalls).catch(() => {});
     api.reps().then(setReps).catch(() => {});
     api.health().then(setHealth).catch(() => {});

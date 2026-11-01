@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from ..agents.analyst import Analyst
 from ..store import repo
-from .deps import OrgId, Prov, Session
+from .deps import OrgId, Prov, Session, owned
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
@@ -43,9 +43,7 @@ async def list_deals(session: Session, org_id: OrgId, providers: Prov) -> list[d
 async def get_deal(
     session: Session, org_id: OrgId, providers: Prov, deal_id: str
 ) -> dict:
-    deal = await repo.get_deal(session, deal_id)
-    if deal is None:
-        raise HTTPException(status_code=404, detail=f"No deal {deal_id}")
+    deal = owned(await repo.get_deal(session, deal_id), org_id, "deal", deal_id)
 
     reps = {r.id: r.name for r in await repo.list_reps(session, org_id)}
     trajectory = await Analyst(providers).trajectory(

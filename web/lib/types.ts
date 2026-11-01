@@ -21,7 +21,7 @@ export type RiskKind = "unresolved_objection" | "no_next_step" | "single_threade
 export type Severity = "low" | "medium" | "high" | "critical";
 export type Emotion = "neutral" | "positive" | "engaged" | "hesitant" | "frustrated" | "skeptical";
 export type SkillAxis = "listening" | "discovery" | "storytelling" | "objection_handling" | "pace_and_presence" | "closing";
-export type StageKey = "upload" | "transcribe" | "diarize" | "metrics" | "anatomy" | "plays" | "embed" | "trajectory" | "done";
+export type StageKey = "upload" | "transcribe" | "diarize" | "metrics" | "anatomy" | "plays" | "embed" | "trajectory" | "coach" | "done";
 export type StageStatus = "pending" | "running" | "ok" | "failed" | "skipped";
 
 /* --- Domain models ------------------------------------------------------- */
@@ -68,6 +68,7 @@ export interface Call {
   status: CallStatus;
   outcome: CallOutcome;
   error: string | null;
+  language: string;
 }
 
 export interface Org {
@@ -89,6 +90,7 @@ export interface Rep {
   attained: number;
   joined_at: string;
   is_top_performer: boolean;
+  archived: boolean;
 }
 
 export interface Cycle {
@@ -168,11 +170,22 @@ export interface AxisScore {
   drivers: string[];
 }
 
+/** Where the deal stands after this call. See metrics/deal.py. */
+export interface DealScore {
+  score: number;
+  /** strong | at risk | weak */
+  band: string;
+  drivers: string[];
+}
+
 /** Metrics translated onto a 0-100 scale against published benchmarks. */
 export interface Scorecard {
   call_id: string;
   overall: number;
   axes: AxisScore[];
+  deal: DealScore | null;
+  /** Why this score should be read with care. Empty when it is sound. */
+  caveats: string[];
 }
 
 /** Rolled-up view of a rep for the leaderboard and profile header. */
@@ -395,6 +408,7 @@ export interface CoachingPlan {
   prescription_rationale: Record<string, string>;
   script: GeneratedScript | null;
   drills: Drill[];
+  source_call_id: string | null;
 }
 
 export interface Deal {
@@ -504,16 +518,39 @@ export interface DojoScore {
   talk_ratio_rep: number;
 }
 
+export interface GapResult {
+  axis: SkillAxis;
+  passed: boolean;
+  evidence: string;
+  feedback: string;
+}
+
+/** Could this rep close the deal now? */
+export interface ClosingAssessment {
+  ready: boolean;
+  deal_closed: boolean;
+  close_evidence: string;
+  gaps: GapResult[];
+  next_focus: string;
+  summary: string;
+  judged_by: string;
+}
+
 export interface DojoSession {
   id: string;
   rep_id: string;
   persona: BuyerPersona;
+  language: string;
   scenario: string;
   started_at: string;
   ended_at: string | null;
   turns: DojoTurn[];
   nudges: CoachNudge[];
   score: DojoScore | null;
+  mode: string;
+  plan_id: string | null;
+  brief: string;
+  assessment: ClosingAssessment | null;
 }
 
 export interface RepRow {
@@ -709,5 +746,84 @@ export interface UploadResponse {
   call_id: string;
   status: string;
   bytes: number;
+  rep_id: string;
   events_url: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+  role: "owner" | "member";
+  rep_id: string | null;
+  org_id: string;
+  org_name: string;
+}
+
+export interface Me {
+  auth_required: boolean;
+  google_enabled: boolean;
+  user: User | null;
+}
+
+export interface TeamInvite {
+  id: string;
+  email: string;
+  role: string;
+  rep_id: string | null;
+  email_sent: boolean;
+}
+
+export interface TeamState {
+  members: User[];
+  invites: TeamInvite[];
+  can_manage: boolean;
+  mail_enabled: boolean;
+}
+
+export interface DealCalibration {
+  decided: number;
+  won: number;
+  lost: number;
+  separation: number | null;
+  reliable: boolean;
+  verdict: string;
+  bands: { band: string; calls: number; won: number; win_rate: number | null }[];
+}
+
+export interface CreditPack {
+  id: string;
+  label: string;
+  credits: number;
+  price: string;
+  currency: string;
+}
+
+export interface CreditEntry {
+  id: string;
+  delta: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface BillingState {
+  enforced: boolean;
+  can_purchase: boolean;
+  can_buy: boolean;
+  simulated: boolean;
+  provider: "paypal" | "braintree" | "simulator" | null;
+  environment: string;
+  balance: number;
+  call_cost: number;
+  packs: CreditPack[];
+  history: CreditEntry[];
+}
+
+export interface OrderResult {
+  order_id: string;
+  status: "created" | "pending" | "completed" | "failed" | "review" | "refunded";
+  credits: number;
+  balance: number;
+  detail: string;
 }

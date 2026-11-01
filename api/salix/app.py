@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
+from .billing import credits
 from .config import get_settings
 from .middleware import (
     ApiKeyMiddleware,
@@ -19,7 +19,9 @@ from .middleware import (
 )
 from .providers import build_providers, get_providers
 from .providers.base import ProviderError
-from .routers import calls, deals, dojo, meta, plays, reports, reps
+from .routers import audio, auth, billing, calls, deals, dojo, meta, plays, reports, reps, roleplay
+from .routers.deps import require_session
+from .schemas.org import Org
 from .store import db, repo
 
 logging.basicConfig(
@@ -48,6 +50,17 @@ async def lifespan(app: FastAPI):
             len(interrupted),
             ", ".join(interrupted[:5]) + ("..." if len(interrupted) > 5 else ""),
         )
+        # Whoever uploaded these paid for an analysis they never got.
+        async with db.session_scope() as session:
+            for call_id in interrupted:
+                await credits.refund_call(session, call_id)
+
+    # A fresh deployment has no organisation until somebody creates one, and
+    # without one every page answers 503. The seed replaces this one if it runs.
+    async with db.session_scope() as session:
+        if not settings.auth_required and await repo.first_org(session) is None:
+            await repo.put_org(session, Org(id=repo.DEFAULT_ORG_ID, name="My team"))
+            log.info("created the default organisation")
 
     log.info(
         "Salix API ready | providers=%s | db=%s | auth=%s | rate-limit=%s",
@@ -56,6 +69,11 @@ async def lifespan(app: FastAPI):
         "key required" if settings.api_key else "OPEN",
         "on" if settings.rate_limit_enabled else "off",
     )
+    if settings.auth_required and not settings.google_configured:
+        log.warning(
+            "SALIX_AUTH_MODE requires sign-in but Google is not configured: "
+            "nobody can sign in."
+        )
     if not settings.api_key:
         # Said once, at the top, where somebody about to expose a port will
         # see it. Silence here is how a demo ends up public.
@@ -63,6 +81,22 @@ async def lifespan(app: FastAPI):
             "No SALIX_API_KEY set: every call in this database is readable by "
             "anyone who can reach this port. Fine on a laptop; set a key "
             "before binding to anything else."
+        )
+    if settings.billing_enforced and not settings.paypal_configured:
+        log.warning(
+            "SALIX_BILLING_MODE charges for uploads but PayPal is not configured: "
+            "nobody can buy a credit, so nobody can upload."
+        )
+    elif settings.paypal_simulated:
+        log.warning(
+            "PayPal is SIMULATED: credits are free and nothing reaches PayPal. "
+            "Add real sandbox keys to switch over."
+        )
+    elif settings.paypal_configured:
+        log.info(
+            "PayPal: %s | uploads %s",
+            settings.paypal_mode,
+            "cost a credit" if settings.billing_enforced else "are free (billing off)",
         )
     if settings.database_url.startswith("sqlite"):
         log.info(
@@ -142,15 +176,25 @@ def create_app() -> FastAPI:
             },
         )
 
-    for router in (meta, calls, reps, plays, deals, reports, dojo):
+    # Public by necessity: health for probes, and sign-in for people who have not.
+    # `meta`'s data routes are guarded through `OrgId`.
+    for router in (meta, auth):
         app.include_router(router.router, prefix="/api")
+    app.include_router(auth.team_router, prefix="/api")
+    app.include_router(billing.webhook_router, prefix="/api")
+    if settings.paypal_simulated:
+        from .billing import simulator
 
-    # Audio is served straight from disk so the call page can scrub a
-    # waveform without a signed-URL round trip in local development.
+        app.include_router(simulator.router, prefix="/api")
+
+    # Protected as a group, so a route added later cannot be left open by accident.
+    for router in (calls, reps, plays, deals, reports, dojo, billing, roleplay):
+        app.include_router(
+            router.router, prefix="/api", dependencies=[Depends(require_session)]
+        )
+
     settings.audio_dir.mkdir(parents=True, exist_ok=True)
-    app.mount(
-        "/audio", StaticFiles(directory=str(settings.audio_dir)), name="audio"
-    )
+    app.include_router(audio.router)
 
     return app
 

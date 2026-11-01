@@ -107,9 +107,11 @@ class EventBus:
 
     @staticmethod
     def _is_final(event: PipelineEvent) -> bool:
-        return event.stage is StageKey.DONE or (
-            event.status is StageStatus.FAILED and event.stage is not StageKey.DONE
-        )
+        # Only the end. A failed stage is not one: anatomy can fail and the
+        # graph carries on, and closing the stream there told the browser the
+        # analysis was complete while it was still running. Every path through
+        # the pipeline emits DONE, including the fatal ones.
+        return event.stage is StageKey.DONE
 
     def history(self, call_id: str) -> list[PipelineEvent]:
         return list(self._history.get(call_id, []))

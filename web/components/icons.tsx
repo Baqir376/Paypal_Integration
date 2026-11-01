@@ -46,6 +46,23 @@ export const IconGauge = (p: IconProps) => (
   </Svg>
 );
 
+/** Team: two people, one behind the other. */
+export const IconTeam = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="6" cy="5.4" r="2.4" />
+    <path d="M1.8 13.2c.5-2.6 2.2-4 4.2-4s3.7 1.4 4.2 4" />
+    <path d="M10.4 3.2a2.4 2.4 0 0 1 0 4.4M12 9.6c1.2.6 2 1.8 2.3 3.6" />
+  </Svg>
+);
+
+/** Credits: a coin. */
+export const IconCoin = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="8" cy="8" r="5.8" />
+    <path d="M8 5v6M6.2 6.6c0-.9.8-1.4 1.8-1.4s1.8.5 1.8 1.3c0 1.9-3.6 1.1-3.6 3 0 .8.8 1.3 1.8 1.3s1.8-.5 1.8-1.4" />
+  </Svg>
+);
+
 /** Calls: a waveform, the actual subject of the product. */
 export const IconWave = (p: IconProps) => (
   <Svg {...p}>

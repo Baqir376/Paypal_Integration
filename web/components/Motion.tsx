@@ -73,58 +73,6 @@ function useSeen<T extends HTMLElement>(rootMargin = "0px 0px -12% 0px") {
 }
 
 /* --------------------------------------------------------------------------
- * Smooth scroll
- * ----------------------------------------------------------------------- */
-
-/**
- * Weighted scrolling.
- *
- * Scroll weight is one of the clearest signals separating a considered site
- * from a default one, and it is almost entirely a feel decision -- a short lerp
- * reads as sluggish, a long one as drifting. These values land a wheel notch in
- * roughly a fifth of a second with a soft stop.
- */
-export function SmoothScroll() {
-  useEffect(() => {
-    if (reducedMotion()) return;
-
-    let lenis: { raf: (t: number) => void; destroy: () => void } | null = null;
-    let frame = 0;
-    let cancelled = false;
-
-    // Imported lazily so the scroll library never lands in the critical path
-    // for a page that may not scroll at all.
-    import("lenis").then(({ default: Lenis }) => {
-      if (cancelled) return;
-      lenis = new Lenis({
-        duration: 1.05,
-        // Exponential ease-out: fast pickup, long settle.
-        easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-        wheelMultiplier: 0.95,
-        touchMultiplier: 1.6,
-        // Touch devices already have momentum scrolling that feels right;
-        // layering ours on top makes them fight.
-        syncTouch: false,
-      });
-
-      const raf = (time: number) => {
-        lenis?.raf(time);
-        frame = requestAnimationFrame(raf);
-      };
-      frame = requestAnimationFrame(raf);
-    });
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(frame);
-      lenis?.destroy();
-    };
-  }, []);
-
-  return null;
-}
-
-/* --------------------------------------------------------------------------
  * Reveal
  * ----------------------------------------------------------------------- */
 
@@ -254,6 +202,7 @@ export function SplitText({
       className={className}
       style={style}
       aria-label={text}
+      role={Tag === "span" || Tag === "p" ? "group" : undefined}
     >
       {words.map((word, i) => (
         <span

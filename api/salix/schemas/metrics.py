@@ -7,6 +7,8 @@ defensible -- and what makes them unit-testable against hand-computed fixtures.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import Field
 
 from .common import SalixModel, SkillAxis
@@ -102,6 +104,14 @@ class AxisScore(SalixModel):
     )
 
 
+class DealScore(SalixModel):
+    """Where the deal stands after this call. See metrics/deal.py."""
+
+    score: float = Field(ge=0.0, le=100.0)
+    band: str = Field(description="strong | at risk | weak")
+    drivers: list[str] = Field(default_factory=list)
+
+
 class Scorecard(SalixModel):
     """Metrics translated onto a 0-100 scale against published benchmarks.
 
@@ -113,6 +123,11 @@ class Scorecard(SalixModel):
     call_id: str
     overall: float = Field(ge=0.0, le=100.0)
     axes: list[AxisScore] = Field(default_factory=list)
+    deal: Optional[DealScore] = None
+    caveats: list[str] = Field(
+        default_factory=list,
+        description="Why this score should be read with care. Empty when it is sound.",
+    )
 
     def axis(self, axis: SkillAxis) -> float:
         return next((a.score for a in self.axes if a.axis is axis), 0.0)

@@ -1,3 +1,7 @@
+> **Out of date on licensing.** This project is now MIT licensed, as the PayPal AI Hackathon
+> requires an open-source licence. What follows about an all-rights-reserved licence no
+> longer applies.
+
 # Protecting the frontend
 
 You asked for a mechanism that makes the UI impossible to copy, even by someone

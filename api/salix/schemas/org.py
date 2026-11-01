@@ -19,6 +19,9 @@ class Rep(SalixModel):
     attained: float = 0.0
     joined_at: str = ""
     is_top_performer: bool = False
+    #: Removed from the team. Their calls stay: colleagues' coaching plans cite
+    #: them and the team's history is computed from them.
+    archived: bool = False
 
 
 class RepSnapshot(SalixModel):

@@ -95,7 +95,14 @@ export function RevealWords({
   }, [text, delay]);
 
   return (
-    <Tag ref={ref as React.Ref<never>} className={className} style={style} aria-label={text}>
+    <Tag
+      ref={ref as React.Ref<never>}
+      className={className}
+      style={style}
+      aria-label={text}
+      // A plain span or div may not carry a label on its own.
+      role={Tag === "span" || Tag === "div" || Tag === "p" ? "group" : undefined}
+    >
       {/* The words are hidden from assistive technology and the whole string
           is announced once from the wrapper, so a screen reader hears a
           sentence rather than a list of words. */}
@@ -167,7 +174,7 @@ export function FadeWords({
   }, [text]);
 
   return (
-    <p ref={ref} className={className} style={style} aria-label={text}>
+    <p ref={ref} className={className} style={style} aria-label={text} role="group">
       <span aria-hidden="true">
         {words.map((word, index) => (
           <span className="fade-word" key={`${word}-${index}`}>

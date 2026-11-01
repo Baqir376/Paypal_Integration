@@ -79,6 +79,10 @@ class DashScopeLLM:
 
     # -- internals -------------------------------------------------------
 
+    def _capped(self, max_tokens: int) -> int:
+        cap = self.settings.llm_max_tokens_cap
+        return min(max_tokens, cap) if cap else max_tokens
+
     async def _chat(
         self,
         messages: list[dict[str, Any]],
@@ -97,7 +101,7 @@ class DashScopeLLM:
                     "model": model,
                     "messages": messages,
                     "temperature": temperature,
-                    "max_tokens": max_tokens,
+                    "max_tokens": self._capped(max_tokens),
                 }
                 if response_format:
                     kwargs["response_format"] = response_format
@@ -242,7 +246,7 @@ class DashScopeLLM:
                 model=model or self.settings.fast_model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_tokens=self._capped(max_tokens),
                 stream=True,
             )
             async for chunk in stream:

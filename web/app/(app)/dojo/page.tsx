@@ -87,6 +87,8 @@ function Dojo() {
   const search = useSearchParams();
   const [reps, setReps] = useState<RepSnapshot[]>([]);
   const [repId, setRepId] = useState(search.get("rep") ?? "");
+  /** Opened from a coaching plan: the same room, but this one has a verdict. */
+  const closingTest = search.get("test") === "1";
   const [difficulty, setDifficulty] = useState(2);
   const [error, setError] = useState<ApiError | null>(null);
   /** A limitation of this browser or its permissions -- not a fault in
@@ -242,9 +244,9 @@ function Dojo() {
     setFinished(false);
     setNudges([]);
     try {
-      const response = await api.dojo.start(
-        repId, difficulty, "", replyLanguage(langId),
-      );
+      const response = closingTest
+        ? await api.roleplay.start(repId, replyLanguage(langId))
+        : await api.dojo.start(repId, difficulty, "", replyLanguage(langId));
       setSession(response.session);
       setPlays(response.plays);
       setOpening(response.opening);
@@ -356,13 +358,27 @@ function Dojo() {
       <header className="page-head">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
-            The Dojo
+            {closingTest ? "Closing test" : "The Dojo"}
           </div>
           <h1 className="display d2" style={{ margin: 0 }}>
-            Practise against the buyer
-            <br />
-            who actually beat you
+            {closingTest ? (
+              <>
+                Can you close it now?
+              </>
+            ) : (
+              <>
+                Practise against the buyer
+                <br />
+                who actually beat you
+              </>
+            )}
           </h1>
+          {closingTest && (
+            <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
+              Use what your coaching plan taught you. The buyer only commits once
+              you have shown it, and you have to ask.
+            </p>
+          )}
           <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
             This persona is not invented. Its objections are lifted from the
             calls in this rep's own lost and stalled deals, weighted by how
@@ -796,7 +812,10 @@ function Dojo() {
             />
 
             {finished && session.score ? (
-              <ScorePanel session={session} onRestart={() => setSession(null)} />
+              <>
+                {session.assessment && <ClosingPanel session={session} />}
+                <ScorePanel session={session} onRestart={() => setSession(null)} />
+              </>
             ) : (
               <>
                 <div className="panel" style={{ padding: "16px 17px" }}>
@@ -976,6 +995,62 @@ function Bubble({
           {(live || interim) && <span className="sx-caret" />}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ClosingPanel({ session }: { session: DojoSession }) {
+  const result = session.assessment!;
+  return (
+    <div
+      className="panel rise"
+      style={{
+        padding: "18px 19px",
+        marginBottom: 14,
+        borderColor: result.ready ? "var(--sage)" : "var(--ember)",
+      }}
+    >
+      <div className="eyebrow" style={{ marginBottom: 8 }}>
+        Closing test
+      </div>
+      <div className="display d3" style={{ margin: "0 0 8px" }}>
+        {result.ready ? "You closed it" : result.deal_closed ? "Closed, with gaps" : "Not closed"}
+      </div>
+      <p style={{ fontSize: 13, margin: "0 0 12px", color: "var(--ink-2)", lineHeight: 1.55 }}>
+        {result.summary}
+      </p>
+      {result.close_evidence && (
+        <p style={{ fontSize: 12.5, margin: "0 0 12px", color: "var(--ink-3)", fontStyle: "italic" }} dir="auto">
+          &ldquo;{result.close_evidence}&rdquo;
+        </p>
+      )}
+      {result.gaps.map((gap) => (
+        <div key={gap.axis} style={{ padding: "8px 0", borderTop: "1px solid var(--rule)", fontSize: 12.8 }}>
+          <span className={`chip ${gap.passed ? "chip-sage" : "chip-rose"}`} style={{ marginRight: 8 }}>
+            {gap.passed ? "shown" : "not shown"}
+          </span>
+          <strong style={{ fontWeight: 550 }}>{AXIS_LABELS[gap.axis]}</strong>
+          {gap.feedback && (
+            <div style={{ marginTop: 4, color: "var(--ink-2)" }}>{gap.feedback}</div>
+          )}
+          {gap.evidence && (
+            <div style={{ marginTop: 3, color: "var(--ink-3)", fontStyle: "italic" }} dir="auto">
+              &ldquo;{gap.evidence}&rdquo;
+            </div>
+          )}
+        </div>
+      ))}
+      {result.next_focus && (
+        <p style={{ fontSize: 12.8, margin: "10px 0 0" }}>
+          <strong style={{ fontWeight: 550 }}>Next: </strong>
+          {result.next_focus}
+        </p>
+      )}
+      {result.judged_by === "measurements" && (
+        <p style={{ fontSize: 11.5, margin: "10px 0 0", color: "var(--ink-3)" }}>
+          Judged from measurements only, so this cannot confirm a close.
+        </p>
+      )}
     </div>
   );
 }

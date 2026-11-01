@@ -157,7 +157,86 @@ export interface UploadResponse {
   call_id: string;
   status: string;
   bytes: number;
+  rep_id: string;
   events_url: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  picture: string;
+  role: "owner" | "member";
+  rep_id: string | null;
+  org_id: string;
+  org_name: string;
+}
+
+export interface Me {
+  auth_required: boolean;
+  google_enabled: boolean;
+  user: User | null;
+}
+
+export interface TeamInvite {
+  id: string;
+  email: string;
+  role: string;
+  rep_id: string | null;
+  email_sent: boolean;
+}
+
+export interface TeamState {
+  members: User[];
+  invites: TeamInvite[];
+  can_manage: boolean;
+  mail_enabled: boolean;
+}
+
+export interface DealCalibration {
+  decided: number;
+  won: number;
+  lost: number;
+  separation: number | null;
+  reliable: boolean;
+  verdict: string;
+  bands: { band: string; calls: number; won: number; win_rate: number | null }[];
+}
+
+export interface CreditPack {
+  id: string;
+  label: string;
+  credits: number;
+  price: string;
+  currency: string;
+}
+
+export interface CreditEntry {
+  id: string;
+  delta: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface BillingState {
+  enforced: boolean;
+  can_purchase: boolean;
+  can_buy: boolean;
+  simulated: boolean;
+  provider: "paypal" | "braintree" | "simulator" | null;
+  environment: string;
+  balance: number;
+  call_cost: number;
+  packs: CreditPack[];
+  history: CreditEntry[];
+}
+
+export interface OrderResult {
+  order_id: string;
+  status: "created" | "pending" | "completed" | "failed" | "review" | "refunded";
+  credits: number;
+  balance: number;
+  detail: string;
 }
 """
 
@@ -175,6 +254,7 @@ MODELS: list[type[BaseModel]] = [
     schemas.Interruption,
     schemas.CallMetrics,
     schemas.AxisScore,
+    schemas.DealScore,
     schemas.Scorecard,
     schemas.RepSnapshot,
     schemas.StageSpan,
@@ -205,6 +285,8 @@ MODELS: list[type[BaseModel]] = [
     schemas.DojoTurn,
     schemas.CoachNudge,
     schemas.DojoScore,
+    schemas.GapResult,
+    schemas.ClosingAssessment,
     schemas.DojoSession,
     schemas.RepRow,
     schemas.TeamMetrics,
