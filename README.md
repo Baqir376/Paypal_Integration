@@ -51,8 +51,8 @@ offline stand-ins for every model, so a fresh clone is fully demonstrable
 offline and the test suite passes with no network.
 
 ```bash
-git clone https://github.com/Baqir376/Alibaba_BanoQabil_Hackathon.git
-cd Alibaba_BanoQabil_Hackathon
+git clone https://github.com/Baqir376/Paypal_Integration.git
+cd Paypal_Integration
 ```
 
 **1 — Install the backend.**
@@ -68,7 +68,7 @@ python -m venv .venv
 **2 — Run the test suite.** Still in `api/`:
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 1006 passed, 1 skipped
+.venv/Scripts/python -m pytest -q     # 1378 passed, 10 skipped
 ```
 
 Everything below assumes `.venv/Scripts/python` on Windows; on macOS and Linux
