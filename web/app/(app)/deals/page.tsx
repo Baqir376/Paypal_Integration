@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { PageNote } from "@/components/Pop";
 import { TrajectoryLine } from "@/components/charts";
 import { IconArrow, IconWarning } from "@/components/icons";
 import { ErrorState, LoadingState } from "@/components/ui";
@@ -51,10 +52,10 @@ export default function DealsPage() {
           <h1 className="display d2" style={{ margin: 0 }}>
             What is slipping, and why
           </h1>
-          <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
+          <PageNote>
             Every flag below is derived by rule from what was actually said, so
             it survives being questioned in a pipeline review.
-          </p>
+          </PageNote>
         </div>
         <button
           className="btn"

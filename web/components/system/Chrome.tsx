@@ -19,15 +19,33 @@ import { useEffect } from "react";
 import { getEngine } from "@/lib/motion";
 
 import { Cursor } from "./Cursor";
-import { StatusPill } from "./StatusPill";
+import { SiteHeader } from "./SiteHeader";
 import { TelemetryRail } from "./TelemetryRail";
+
+/**
+ * Which kind of page this is.
+ *
+ * The rail, the custom cursor and the drifting field set the mood on the public site.
+ * In the app they are noise around numbers somebody is trying to read, and the app has
+ * its own navigation. The sign-in pages are a page of their own.
+ */
+function surfaceOf(pathname: string): "site" | "auth" | "app" {
+  if (pathname === "/" || pathname.startsWith("/archive")) return "site";
+  if (pathname.startsWith("/login") || pathname.startsWith("/signup") || pathname.startsWith("/reset-password")) return "auth";
+  return "app";
+}
 
 export function Chrome() {
   const pathname = usePathname();
+  const surface = surfaceOf(pathname);
 
   useEffect(() => {
     getEngine();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.surface = surface;
+  }, [surface]);
 
   // A route change replaces the document's entire measurable geometry, so
   // every pin and every scrub has to be re-measured. Two frames: one for the
@@ -45,11 +63,15 @@ export function Chrome() {
 
   return (
     <>
-      <TelemetryRail />
-      <StatusPill />
-      <Cursor />
-      <div className="sx-vignette no-print" aria-hidden="true" />
-      <div className="sx-grain no-print" aria-hidden="true" />
+      {surface === "site" && (
+        <>
+          <TelemetryRail />
+          <SiteHeader />
+          <Cursor />
+          <div className="sx-vignette no-print" aria-hidden="true" />
+          <div className="sx-grain no-print" aria-hidden="true" />
+        </>
+      )}
     </>
   );
 }

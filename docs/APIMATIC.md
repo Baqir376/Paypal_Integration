@@ -42,3 +42,42 @@ build.
 - None of this has run against PayPal's real sandbox, because PayPal does not open
   accounts in Pakistan, where this was built. It runs in tests against a stand-in at
   the HTTP layer. Add PayPal sandbox keys to `.env` and it is used automatically.
+
+## An SDK and docs portal for Salix's own API
+
+The steps above are about calling PayPal. Salix's own API also has a client, generated with
+the APIMatic CLI (`@apimatic/cli` 2.0.0) from [`openapi.json`](openapi.json).
+
+```
+cd api && python scripts/export_openapi.py          # writes docs/openapi.json
+cp docs/openapi.json portal-source/src/spec/        # copy it into the portal project
+cd portal-source
+apimatic api validate
+apimatic portal serve                               # the docs portal, locally
+apimatic sdk generate -l python                     # writes sdk/python, which is not committed
+```
+
+### Generating it is not the same as it working
+
+APIMatic scored the improved description 100/100 for SDK generation, but the first SDK
+generated from it failed when it was run. Three problems showed up, and all were fixed in
+the description (`api/scripts/export_openapi.py`):
+
+| Problem | What it did | Fix |
+|---|---|---|
+| The upload forms were named schemas with a file field | The Python SDK crashed on import | Put each form on its operation |
+| `anyOf` with `null` lost the null | The SDK refused `user: null` when signed out | Written as `oneOf` |
+| `/api/auth/me` was marked as needing no credentials | The SDK did not send the session, so everyone looked signed out | Made the session optional there |
+
+The final SDK then passed 17 checks against a running server: signing up and in, a wrong
+password, requests with no session, unknown records, checkout and capture, adding a
+salesperson, uploading a recording, and logging out. That run used the local PayPal stand-in,
+and that test script is not in this repository.
+
+### Limits
+
+- The API score is 72 out of 100, measured before these three fixes. Most of the remaining
+  warnings are for missing example values.
+- Only the Python SDK has been generated and tested, and not every route was called.
+- Neither the SDK nor the portal is published, and the description still points at `localhost`.
+

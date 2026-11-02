@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { ScoreRing, Sparkline, Stat, TalkRatioBar } from "@/components/charts";
 import { IconArrow, IconWarning } from "@/components/icons";
 import { Avatar, ErrorState, LoadingState, SectionHead } from "@/components/ui";
+import { FirstRun } from "@/components/FirstRun";
 import { ApiError, api } from "@/lib/api";
 import {
   SEVERITY_CHIP,
@@ -27,15 +28,27 @@ import {
 } from "@/lib/format";
 import type { Overview } from "@/lib/types";
 
+/** Read in the browser only: the server does not know what time it is for them. */
+function greeting(name: string): string {
+  const hour = typeof window === "undefined" ? 12 : new Date().getHours();
+  const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  return name ? `${part}, ${name}` : part;
+}
+
 export default function ConsolePage() {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [firstName, setFirstName] = useState("");
 
   useEffect(() => {
     api
       .overview()
       .then(setData)
       .catch((e: ApiError) => setError(e));
+    api
+      .me()
+      .then((me) => setFirstName(me.user?.name.split(" ")[0] ?? ""))
+      .catch(() => {});
   }, []);
 
   if (error) return <ErrorState message={error.detail} status={error.status} />;
@@ -45,22 +58,39 @@ export default function ConsolePage() {
   const struggling = reps[reps.length - 1];
   const leader = reps[0];
 
+  if (team.calls_analyzed === 0) {
+    return (
+      <div className="page" data-status="COMMAND CENTRE" style={{ maxWidth: 820 }}>
+        <header className="page-head">
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              {org.name}
+            </div>
+            <h1 className="display d2" style={{ margin: 0 }}>
+              {firstName ? `Welcome, ${firstName}` : "Welcome to Salix"}
+            </h1>
+          </div>
+        </header>
+        <FirstRun teamSize={reps.length} />
+      </div>
+    );
+  }
+
   return (
     <div className="page" data-status="COMMAND CENTRE">
       <header className="page-head">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
-            {org.name} · {org.cycle_label}
+            {[org.name, org.cycle_label].filter(Boolean).join(" · ")}
           </div>
           <h1 className="display d2" style={{ margin: 0 }}>
-            {team.calls_analyzed} calls, listened to properly
+            {greeting(firstName)}
           </h1>
           <p
             className="lede"
             style={{ marginTop: 12, marginBottom: 0, maxWidth: "46ch" }}
           >
-            {team.hours_analyzed} hours of conversation, measured line by line.
-            Here is what it says about the quarter.
+            {team.calls_analyzed} {team.calls_analyzed === 1 ? "call" : "calls"} · {team.hours_analyzed} hours
           </p>
         </div>
         <Link href="/upload" className="btn btn-primary" style={{ flexShrink: 0 }}>
@@ -152,7 +182,7 @@ export default function ConsolePage() {
                         {snapshot.rep.name}
                       </Link>
                       <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 1 }}>
-                        {snapshot.calls} calls · {snapshot.won}W / {snapshot.lost}L
+                        {snapshot.calls} {snapshot.calls === 1 ? "call" : "calls"} · {snapshot.won}W / {snapshot.lost}L
                       </div>
                     </td>
                     <td>

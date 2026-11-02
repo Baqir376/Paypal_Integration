@@ -205,6 +205,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         "/api/calls/upload": (10, 300),  # a seven-stage graph per call
         "/api/reports/generate": (5, 300),
         "/api/auth/google": (30, 60),    # one Google round trip per attempt
+        "/api/auth/login": (20, 60),     # a deliberately slow hash per attempt
+        "/api/auth/signup": (10, 300),   # the same, and an email
+        "/api/auth/password": (10, 300),  # an email, or a slow hash
+        "/api/auth/email": (20, 300),    # an email
         "/api/roleplay/start": (20, 60),  # builds a persona from the archive
         "/api/billing/checkout": (20, 300),  # creates a real PayPal order
         "/api/billing/reconcile": (30, 60),  # one PayPal read per open order

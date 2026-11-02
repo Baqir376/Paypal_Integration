@@ -1,5 +1,6 @@
 "use client";
 
+import { LayoutGroup, MotionConfig, motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,6 +10,7 @@ import { cx } from "@/lib/format";
 import type { BillingState, Health, Me } from "@/lib/types";
 
 import { PageTransition } from "./Motion";
+import { QuickActions, Toaster, popToast } from "./Pop";
 
 import { CommandPalette } from "./CommandPalette";
 import { Mark } from "./Mark";
@@ -46,6 +48,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
       .then(setMe)
       .catch(() => setMe(null));
   }, []);
+
+  // Set on the way out of the sign-in screen, so this happens once and only then.
+  useEffect(() => {
+    if (!me?.user) return;
+    try {
+      if (sessionStorage.getItem("salix-welcome")) {
+        sessionStorage.removeItem("salix-welcome");
+        popToast(`You're in, ${me.user.name.split(" ")[0]}`);
+      }
+    } catch {
+      /* only costs a greeting */
+    }
+  }, [me]);
 
   const mustSignIn = !!me?.auth_required && !me.user;
   useEffect(() => {
@@ -119,6 +134,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
 
+        <MotionConfig reducedMotion="user">
+        <LayoutGroup id="rail">
         <nav className="app-rail-nav">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -126,26 +143,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <Link
                 key={href}
                 href={href}
+                className="rail-link"
+                data-active={active}
                 aria-current={active ? "page" : undefined}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 10px",
-                  borderRadius: "var(--r)",
-                  marginBottom: 1,
-                  fontSize: 13.5,
-                  fontWeight: active ? 550 : 450,
-                  color: active ? "var(--ink)" : "var(--ink-2)",
-                  background: active ? "var(--paper-3)" : "transparent",
-                  transition: "background 120ms ease, color 120ms ease",
-                }}
               >
-                <Icon
-                  size={15}
-                  style={{ color: active ? "var(--willow)" : "var(--ink-3)" }}
-                />
-                {label}
+                {active && <RailMarker />}
+                <Icon size={15} className="rail-link-icon" />
+                <span className="rail-link-label">{label}</span>
               </Link>
             );
           })}
@@ -154,40 +158,29 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
           <Link
             href="/upload"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "8px 10px",
-              borderRadius: "var(--r)",
-              fontSize: 13.5,
-              color: pathname === "/upload" ? "var(--ink)" : "var(--ink-2)",
-              background: pathname === "/upload" ? "var(--paper-3)" : "transparent",
-            }}
+            className="rail-link"
+            data-active={pathname === "/upload"}
+            aria-current={pathname === "/upload" ? "page" : undefined}
           >
-            <IconUpload size={15} style={{ color: "var(--ink-3)" }} />
-            Analyse a call
+            {pathname === "/upload" && <RailMarker />}
+            <IconUpload size={15} className="rail-link-icon" />
+            <span className="rail-link-label">Analyse a call</span>
           </Link>
 
           {billing && (billing.enforced || billing.can_purchase) && (
             <Link
               href="/billing"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "8px 10px",
-                borderRadius: "var(--r)",
-                fontSize: 13.5,
-                color: pathname.startsWith("/billing") ? "var(--ink)" : "var(--ink-2)",
-                background: pathname.startsWith("/billing") ? "var(--paper-3)" : "transparent",
-              }}
+              className="rail-link"
+              data-active={pathname.startsWith("/billing")}
+              aria-current={pathname.startsWith("/billing") ? "page" : undefined}
             >
-              <IconCoin size={15} style={{ color: "var(--ink-3)" }} />
-              Credits
+              {pathname.startsWith("/billing") && <RailMarker />}
+              <IconCoin size={15} className="rail-link-icon" />
+              <span className="rail-link-label">Credits</span>
               <span
                 className="num"
                 style={{
+                  position: "relative",
                   marginLeft: "auto",
                   fontSize: 12,
                   color: billing.balance > 0 ? "var(--ink-3)" : "var(--rose)",
@@ -198,6 +191,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           )}
         </nav>
+        </LayoutGroup>
+        </MotionConfig>
 
         <div className="app-rail-foot">
           <button
@@ -225,11 +220,25 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main style={{ minWidth: 0 }}>
+      <main
+        style={{ minWidth: 0 }}
+        className="app-main"
+        onPointerMove={(event) => {
+          // A soft light under the pointer, on whichever card it is over.
+          const card = (event.target as Element).closest<HTMLElement>(".panel, .panel-flush");
+          if (!card) return;
+          const box = card.getBoundingClientRect();
+          card.style.setProperty("--spot-x", `${event.clientX - box.left}px`);
+          card.style.setProperty("--spot-y", `${event.clientY - box.top}px`);
+        }}
+      >
+        {me?.user && me.mail_enabled && !me.user.email_verified && <ConfirmEmail email={me.user.email} />}
         <PageTransition>{children}</PageTransition>
       </main>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <QuickActions />
+      <Toaster />
     </div>
   );
 }
@@ -277,6 +286,45 @@ function ModeBadge({ health }: { health: Health | null }) {
       <span className="eyebrow" style={{ color: live ? "var(--ink-2)" : "var(--ink-3)" }}>
         {named ? `${named} live` : "Offline mode"}
       </span>
+    </div>
+  );
+}
+
+function RailMarker() {
+  return (
+    <motion.span
+      layoutId="rail-marker"
+      className="rail-marker"
+      transition={{ type: "spring", stiffness: 480, damping: 38 }}
+    />
+  );
+}
+
+function ConfirmEmail({ email }: { email: string }) {
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+
+  async function resend() {
+    setState("sending");
+    try {
+      await api.resendVerification();
+      setState("sent");
+    } catch {
+      setState("failed");
+    }
+  }
+
+  return (
+    <div className="confirm-email" role="status">
+      <span>
+        Confirm <strong>{email}</strong> from your inbox to invite teammates.
+      </span>
+      {state === "sent" ? (
+        <span>Sent. Check your inbox.</span>
+      ) : (
+        <button className="btn btn-ghost btn-sm" onClick={resend} disabled={state === "sending"}>
+          {state === "failed" ? "Could not send. Try again" : "Send it again"}
+        </button>
+      )}
     </div>
   );
 }

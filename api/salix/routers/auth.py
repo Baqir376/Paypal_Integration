@@ -12,12 +12,12 @@ import re
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from pydantic import Field
 from sqlalchemy.exc import IntegrityError
 
-from ..auth import accounts, google, mailer
+from ..auth import accounts, google, mailer, passwords
 from ..auth.accounts import AuthContext, MEMBER, OWNER, SESSION_COOKIE
 from ..config import Settings, get_settings
 from ..schemas.common import SalixModel
@@ -44,11 +44,14 @@ class UserOut(SalixModel):
     rep_id: Optional[str] = None
     org_id: str
     org_name: str = ""
+    email_verified: bool = True
 
 
 class Me(SalixModel):
     auth_required: bool
     google_enabled: bool
+    #: Without a mail server, addresses cannot be confirmed or passwords reset.
+    mail_enabled: bool = False
     user: Optional[UserOut] = None
 
 
@@ -79,6 +82,26 @@ class RoleChange(SalixModel):
 
 class OrgRename(SalixModel):
     name: str = Field(min_length=1, max_length=120)
+
+
+class SignUp(SalixModel):
+    name: str = Field(default="", max_length=200)
+    email: str = Field(default="", max_length=320)
+    password: str = Field(default="", max_length=4096)
+
+
+class LogIn(SalixModel):
+    email: str = Field(default="", max_length=320)
+    password: str = Field(default="", max_length=4096)
+
+
+class ForgotPassword(SalixModel):
+    email: str = Field(default="", max_length=320)
+
+
+class ResetPassword(SalixModel):
+    token: str = Field(default="", max_length=256)
+    password: str = Field(default="", max_length=4096)
 
 
 def _set_cookie(response: Response, settings: Settings, name: str, value: str, max_age: int) -> None:
@@ -114,6 +137,7 @@ async def _user_out(session, user: UserRow) -> UserOut:
         rep_id=user.rep_id,
         org_id=user.org_id,
         org_name=org.name if org else "",
+        email_verified=await accounts.email_verified(session, user.id),
     )
 
 
@@ -121,7 +145,11 @@ async def _user_out(session, user: UserRow) -> UserOut:
 async def me(request: Request, session: Session) -> Me:
     """Public: the page has to ask this before it knows whether to show a login."""
     settings = get_settings()
-    out = Me(auth_required=settings.auth_required, google_enabled=settings.google_configured)
+    out = Me(
+        auth_required=settings.auth_required,
+        google_enabled=settings.google_configured,
+        mail_enabled=settings.mail_configured,
+    )
     if settings.auth_required:
         context = await accounts.resolve_session(session, request.cookies.get(SESSION_COOKIE))
         if context is not None:
@@ -225,6 +253,139 @@ async def logout(request: Request, session: Session) -> Response:
 
 
 # --------------------------------------------------------------------------
+# Email and password
+# --------------------------------------------------------------------------
+
+WRONG_PASSWORD = "That email and password do not match. After several wrong tries, wait 15 minutes."
+
+
+def _accounts_on(settings: Settings) -> None:
+    if not settings.auth_required:
+        raise HTTPException(status_code=404, detail="Accounts are not enabled on this deployment.")
+
+
+def _email(raw: str) -> str:
+    email = raw.strip().lower()
+    if not EMAIL.match(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
+    return email
+
+
+def _new_password(password: str) -> str:
+    if len(password) < passwords.MIN_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Use at least {passwords.MIN_LENGTH} characters for your password.")
+    if len(password) > passwords.MAX_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Use at most {passwords.MAX_LENGTH} characters for your password.")
+    return password
+
+
+async def _signed_in(session, user: UserRow, settings: Settings) -> Response:
+    token = await accounts.create_session(session, user.id, settings)
+    out = await _user_out(session, user)
+    await session.commit()
+    response = Response(content=out.model_dump_json(), media_type="application/json")
+    _set_cookie(response, settings, SESSION_COOKIE, token, settings.session_days * 86400)
+    return response
+
+
+@router.post("/signup", response_model=UserOut)
+async def signup(session: Session, body: SignUp, background: BackgroundTasks) -> Response:
+    settings = get_settings()
+    _accounts_on(settings)
+    name = " ".join(body.name.split())[:120]
+    if not name:
+        raise HTTPException(status_code=400, detail="Enter your name.")
+    email = _email(body.email)
+    _new_password(body.password)
+    try:
+        user = await accounts.sign_up(session, email=email, name=name, password=body.password)
+    except accounts.EmailTaken:
+        raise HTTPException(
+            status_code=409,
+            detail="There is already an account with this address. Log in, or continue with Google.",
+        ) from None
+    if settings.mail_configured:
+        token = await accounts.issue_token(session, user.id, accounts.VERIFY)
+        background.add_task(mailer.send_verification, settings, to=email, token=token)
+    return await _signed_in(session, user, settings)
+
+
+@router.post("/login", response_model=UserOut)
+async def login(session: Session, body: LogIn) -> Response:
+    settings = get_settings()
+    _accounts_on(settings)
+    # The length check stops an enormous guess costing a full hash.
+    user = None
+    if len(body.password) <= passwords.MAX_LENGTH:
+        user = await accounts.log_in(session, body.email.strip().lower(), body.password)
+    if user is None:
+        await session.commit()
+        raise HTTPException(status_code=401, detail=WRONG_PASSWORD)
+    return await _signed_in(session, user, settings)
+
+
+@router.post("/password/forgot", status_code=202)
+async def forgot_password(session: Session, body: ForgotPassword, background: BackgroundTasks) -> dict:
+    """The same answer whether or not there is an account, and the mail goes out after it."""
+    settings = get_settings()
+    _accounts_on(settings)
+    if not settings.mail_configured:
+        raise HTTPException(status_code=409, detail="Password reset needs a mail server, and this one has none.")
+    email = _email(body.email)
+    user = await accounts.user_for_email(session, email)
+    if user is not None:
+        token = await accounts.issue_token(session, user.id, accounts.RESET)
+        await session.commit()
+        background.add_task(mailer.send_password_reset, settings, to=email, token=token)
+    return {"sent": True}
+
+
+@router.post("/password/reset", response_model=UserOut)
+async def reset_password(session: Session, body: ResetPassword) -> Response:
+    settings = get_settings()
+    _accounts_on(settings)
+    _new_password(body.password)
+    user = await accounts.user_for_token(session, body.token, accounts.RESET)
+    if user is None:
+        await session.commit()
+        raise HTTPException(status_code=400, detail="That link has expired or was already used. Ask for a new one.")
+    await accounts.reset_password(session, user, body.password, settings)
+    return await _signed_in(session, user, settings)
+
+
+@router.get("/email/verify")
+async def verify_email(session: Session, token: str = "") -> RedirectResponse:
+    """Mail scanners open links before people do, so this can be opened again, and it
+    confirms the address without signing anybody in."""
+    settings = get_settings()
+    _accounts_on(settings)
+    user = await accounts.user_for_token(session, token, accounts.VERIFY)
+    if user is None:
+        await session.commit()
+        return _failed(settings, "link_expired")
+    await accounts.confirm_email(session, user, settings)
+    await session.commit()
+    return RedirectResponse(f"{settings.app_url.rstrip('/')}/console", status_code=302)
+
+
+@router.post("/email/resend", status_code=202, dependencies=[Depends(require_session)])
+async def resend_verification(request: Request, session: Session, background: BackgroundTasks) -> dict:
+    settings = get_settings()
+    context = _context(request)
+    if context is None:
+        raise HTTPException(status_code=404, detail="Accounts are not enabled on this deployment.")
+    if not settings.mail_configured:
+        raise HTTPException(status_code=409, detail="This server cannot send email.")
+    if await accounts.email_verified(session, context.user_id):
+        return {"sent": False}
+    user = await session.get(UserRow, context.user_id)
+    token = await accounts.issue_token(session, user.id, accounts.VERIFY)
+    await session.commit()
+    background.add_task(mailer.send_verification, settings, to=user.email, token=token)
+    return {"sent": True}
+
+
+# --------------------------------------------------------------------------
 # The team
 # --------------------------------------------------------------------------
 
@@ -240,6 +401,16 @@ def _require_owner(request: Request) -> AuthContext:
     if context.role != OWNER:
         raise HTTPException(status_code=403, detail="Only the team owner can do that.")
     return context
+
+
+async def _require_proven_address(session, context: AuthContext) -> None:
+    """An unproven account might be somebody else's address. Keeping it alone in its team
+    is what lets the real owner safely take it over later."""
+    if not await accounts.email_verified(session, context.user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Confirm your email address before inviting anyone. Signing in with Google also confirms it.",
+        )
 
 
 @team_router.get("", response_model=TeamOut, dependencies=[Depends(require_session)])
@@ -263,6 +434,7 @@ async def invite(request: Request, session: Session, org_id: OrgId, body: Invite
     """They join this team the first time they sign in with this address, and are
     told by email if a mail server is configured."""
     context = _require_owner(request)
+    await _require_proven_address(session, context)
     email = body.email.strip().lower()
     if not EMAIL.fullmatch(email):
         raise HTTPException(status_code=422, detail="That does not look like an email address.")
@@ -312,6 +484,7 @@ async def _send_invite(session, context: AuthContext, email: str) -> bool:
 @team_router.post("/invites/{invite_id}/resend", response_model=InviteOut, dependencies=[Depends(require_session)])
 async def resend_invite(request: Request, session: Session, invite_id: str) -> InviteOut:
     context = _require_owner(request)
+    await _require_proven_address(session, context)
     row = await session.get(InviteRow, invite_id)
     if row is None or row.org_id != context.org_id:
         raise HTTPException(status_code=404, detail=f"No invite {invite_id}")

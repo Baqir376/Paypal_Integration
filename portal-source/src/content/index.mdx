@@ -1,0 +1,31 @@
+---
+title: Salix API
+description: Score sales calls, write coaching plans and practise closing
+---
+
+Salix listens to recorded sales calls in English, Urdu and Roman Urdu. It scores each deal, writes a coaching plan for the weakest skills, and tests salespeople against a buyer built from the deals they lost.
+
+## Try it
+
+```python
+from salix_api import SalixApiClient
+
+client = SalixApiClient(base_url="http://localhost:8000")
+client.auth_api.post_auth_login(body={"email": "you@company.com", "password": "your password"})
+
+print(client.billing.get_billing().balance)
+```
+
+The client keeps your session after you log in, so later calls are signed in.
+
+<Cards>
+
+<Card title="SDKs" href="/sdks">
+Typed client libraries, generated from the same description as this reference.
+</Card>
+
+<Card title="Agent-friendly docs" href="/llms.txt" external>
+These pages as Markdown, for AI coding assistants.
+</Card>
+
+</Cards>

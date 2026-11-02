@@ -12,8 +12,6 @@
     "design:unlock": "node scripts/design-vault.mjs unlock",
     "design:status": "node scripts/design-vault.mjs status",
     "design:keygen": "node scripts/design-vault.mjs keygen",
-    "predev": "node scripts/design-vault.mjs unlock --quiet",
-    "prebuild": "node scripts/design-vault.mjs unlock --quiet",
     "check:production": "node scripts/production.mjs",
     "check:e2e": "node scripts/e2e.mjs"
   },
@@ -22,7 +20,7 @@
     "@react-three/fiber": "9.3.0",
     "@react-three/postprocessing": "^3.0.4",
     "clsx": "2.1.1",
-    "framer-motion": "12.23.12",
+    "framer-motion": "12.43.0",
     "geist": "1.5.1",
     "gsap": "^3.15.0",
     "lenis": "^1.3.11",

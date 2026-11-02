@@ -20,12 +20,14 @@ os.environ.setdefault("SALIX_GOOGLE_CLIENT_SECRET", "e2e")
 os.environ.setdefault("SALIX_PAYPAL_SIMULATOR", "true")
 os.environ.setdefault("SALIX_PROVIDER_MODE", "mock")
 os.environ.setdefault("SALIX_RATE_LIMIT_ENABLED", "false")
+os.environ.setdefault("SALIX_SMTP_HOST", "e2e.invalid")
+os.environ.setdefault("SALIX_SMTP_FROM", "salix@e2e.invalid")
 
 import httpx  # noqa: E402
 from fastapi.responses import HTMLResponse, RedirectResponse  # noqa: E402
 
 from salix.app import create_app  # noqa: E402
-from salix.auth import google  # noqa: E402
+from salix.auth import google, mailer  # noqa: E402
 from salix.config import get_settings  # noqa: E402
 
 from .test_accounts import _CertResponse, signed  # noqa: E402
@@ -46,6 +48,18 @@ def _token_endpoint(request: httpx.Request) -> httpx.Response:
 
 
 google._http = lambda: httpx.AsyncClient(transport=httpx.MockTransport(_token_endpoint))
+
+
+#: Every email the app tried to send, newest last, in place of a mail server.
+_mail: list[dict] = []
+mailer._send = lambda _settings, message: _mail.append(
+    {"to": message["To"], "subject": message["Subject"], "body": message.get_content()}
+)
+
+
+@app.get("/api/e2e/mail")
+async def sent_mail() -> list[dict]:
+    return _mail
 
 
 @app.get("/api/e2e/google", response_class=HTMLResponse)

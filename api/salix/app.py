@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
     if settings.auth_required and not settings.google_configured:
         log.warning(
             "SALIX_AUTH_MODE requires sign-in but Google is not configured: "
-            "nobody can sign in."
+            "people can only sign in with a password."
         )
     if not settings.api_key:
         # Said once, at the top, where somebody about to expose a port will

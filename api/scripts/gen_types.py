@@ -170,11 +170,13 @@ export interface User {
   rep_id: string | null;
   org_id: string;
   org_name: string;
+  email_verified: boolean;
 }
 
 export interface Me {
   auth_required: boolean;
   google_enabled: boolean;
+  mail_enabled: boolean;
   user: User | null;
 }
 

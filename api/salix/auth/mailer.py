@@ -1,4 +1,4 @@
-"""Sending the one email this product sends: an invitation.
+"""Sending the emails this product sends: an invitation, and account links.
 
 Plain SMTP, so any provider works and none is written into the code. A failure is
 reported rather than raised: the invitation exists either way, and whoever sent it
@@ -32,6 +32,48 @@ def _send(settings: Settings, message: EmailMessage) -> None:
         smtp.send_message(message)
 
 
+async def _deliver(settings: Settings, *, to: str, subject: str, body: str) -> bool:
+    if not settings.mail_configured:
+        return False
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = settings.smtp_from
+    message["To"] = to
+    message.set_content(body)
+    try:
+        await asyncio.to_thread(_send, settings, message)
+    except (smtplib.SMTPException, OSError) as exc:
+        log.warning("could not send an account email: %s", type(exc).__name__)
+        return False
+    return True
+
+
+async def send_verification(settings: Settings, *, to: str, token: str) -> bool:
+    link = f"{settings.app_url.rstrip('/')}/api/auth/email/verify?token={token}"
+    return await _deliver(
+        settings,
+        to=to,
+        subject="Confirm your email for Salix",
+        body=(
+            f"Confirm this address to finish setting up your Salix account:\n{link}\n\n"
+            "If you did not sign up, ignore this email and do not open the link.\n"
+        ),
+    )
+
+
+async def send_password_reset(settings: Settings, *, to: str, token: str) -> bool:
+    link = f"{settings.app_url.rstrip('/')}/reset-password?token={token}"
+    return await _deliver(
+        settings,
+        to=to,
+        subject="Reset your Salix password",
+        body=(
+            f"Choose a new password here. The link works for one hour:\n{link}\n\n"
+            "If you did not ask for this, ignore this email and your password stays as it is.\n"
+        ),
+    )
+
+
 async def send_invite(settings: Settings, *, to: str, team: str, inviter: str) -> bool:
     """True if the mail server accepted it."""
     if not settings.mail_configured:
@@ -45,7 +87,8 @@ async def send_invite(settings: Settings, *, to: str, team: str, inviter: str) -
     message["To"] = to
     message.set_content(
         f"{inviter} has invited you to join {team} on Salix.\n\n"
-        f"Sign in with Google using this address ({to}) and you will join the team:\n"
+        f"Sign in using this address ({to}), with Google or a password, and you will "
+        "join the team:\n"
         f"{link}\n"
     )
     try:

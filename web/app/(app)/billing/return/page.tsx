@@ -8,11 +8,13 @@
  * because a capture can only land once.
  */
 
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { IconArrow, IconCheck, IconWarning } from "@/components/icons";
+import { Burst } from "@/components/Pop";
 import { LoadingState } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import type { OrderResult } from "@/lib/types";
@@ -40,7 +42,13 @@ function ReturnPage() {
 
   return (
     <div className="page" data-status="PAYMENT" style={{ maxWidth: 620 }}>
-      <div className="panel" style={{ padding: "26px 28px" }}>
+      <motion.div
+        className="panel"
+        style={{ padding: "26px 28px" }}
+        initial={{ scale: 0.92, opacity: 0, y: 18 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 22 }}
+      >
         {!result && !failure && (
           <>
             <div className="eyebrow" style={{ marginBottom: 10 }}>
@@ -56,19 +64,30 @@ function ReturnPage() {
         )}
 
         {paid && (
-          <>
-            <IconCheck size={22} style={{ color: "var(--sage)", marginBottom: 12 }} />
+          <div className="paid">
+            <Burst />
+            <motion.span
+              className="paid-tick"
+              initial={{ scale: 0, rotate: -40 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 12 }}
+            >
+              <IconCheck size={28} />
+            </motion.span>
             <h1 className="display d3" style={{ margin: 0 }}>
               <span className="num">{result.credits}</span> credits added
             </h1>
-            <p className="lede" style={{ marginTop: 12 }}>
+            <p className="lede" style={{ marginTop: 8 }}>
               You now have <span className="num">{result.balance}</span> credits.
             </p>
             <Link href="/upload" className="btn btn-primary">
               Analyse a call
               <IconArrow size={13} />
             </Link>
-          </>
+            <div className="paid-order num">
+              Order {result.order_id} · PayPal Server SDK by APIMatic
+            </div>
+          </div>
         )}
 
         {result && !paid && (
@@ -102,7 +121,7 @@ function ReturnPage() {
             </Link>
           </>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }

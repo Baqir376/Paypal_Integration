@@ -141,15 +141,25 @@ async def checkout_page(token: str) -> str:
     # Only values this server produced, checked above or taken from its own pack table.
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Simulated PayPal checkout</title>
-<style>body{{font:16px system-ui;max-width:440px;margin:48px auto;padding:0 16px;color:#222}}
-.tag{{background:#fff3cd;border:1px solid #d9a800;padding:10px 12px;border-radius:6px;font-size:14px}}
-a{{display:block;text-align:center;padding:12px;margin-top:12px;border-radius:6px;text-decoration:none;border:1px solid #999;color:#222}}
-a.pay{{background:#222;color:#fff}}</style></head><body>
+<style>*{{box-sizing:border-box}}
+body{{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;font:15px system-ui,sans-serif;color:#f4f5f0;
+background:radial-gradient(60vmax 60vmax at 20% 10%,#3f4f14,transparent),radial-gradient(60vmax 60vmax at 90% 80%,#123f3b,transparent),#06080a}}
+main{{width:min(400px,100%);padding:30px 28px;border-radius:24px;background:rgb(255 255 255 / .07);backdrop-filter:blur(24px);
+box-shadow:inset 0 0 0 1px rgb(255 255 255 / .16),0 30px 80px -24px #000;animation:pop .55s cubic-bezier(.2,1.5,.4,1) both}}
+@keyframes pop{{from{{opacity:0;transform:scale(.8) translateY(20px)}}}}
+.tag{{margin:0 0 20px;padding:10px 12px;border-radius:11px;font-size:13px;line-height:1.45;background:rgb(255 196 57 / .13);box-shadow:inset 0 0 0 1px rgb(255 196 57 / .45)}}
+h1{{margin:0;font-size:34px;font-weight:600;letter-spacing:-.01em}}
+.order{{margin:6px 0 22px;font:12px ui-monospace,monospace;opacity:.72}}
+a{{display:block;padding:13px;margin-top:10px;border-radius:13px;text-align:center;text-decoration:none;color:#f4f5f0;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .2);transition:transform .2s,background .2s}}
+a:hover{{transform:translateY(-1px);background:rgb(255 255 255 / .08)}}
+a.pay{{font-weight:650;color:#15190a;background:#d4f55a;box-shadow:none}}a.pay:hover{{background:#dcfa6c}}
+@media (prefers-reduced-motion:reduce){{main{{animation:none}}a{{transition:none}}}}</style></head><body><main>
 <p class="tag"><b>Simulated checkout. This is not PayPal.</b> No account is used and no money moves.</p>
 <h1>Pay {amount['currency_code']} {amount['value']}</h1>
+<p class="order">Order {token}, created with APIMatic's PayPal Server SDK</p>
 <a class="pay" href="/api{ROUTE}/approve?token={token}">Approve simulated payment</a>
 <a href="{get_settings().app_url.rstrip('/')}/billing?cancelled=1">Cancel and return</a>
-</body></html>"""
+</main></body></html>"""
 
 
 @router.get(f"{ROUTE}/approve")

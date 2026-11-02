@@ -120,7 +120,9 @@ await amna.getByRole("link", { name: /buy credits/i }).click();
 await amna.waitForURL("**/billing");
 check("simulated payments are called out", await see(amna, /Simulated payments/));
 
-await amna.getByRole("button", { name: /simulated paypal checkout/i }).first().click();
+await amna.getByRole("button", { name: /pay with paypal/i }).first().click();
+check("the checkout pop-up says it is simulated", await see(amna, /Simulated checkout/));
+await amna.getByRole("button", { name: /continue to simulated checkout/i }).click();
 await amna.waitForURL("**/api/paypal-simulator?**", { timeout: 15000 });
 check("the checkout page says it is not PayPal", await see(amna, /This is not PayPal/));
 await amna.getByRole("link", { name: /cancel and return/i }).click();
@@ -128,7 +130,8 @@ await amna.waitForURL("**/billing?cancelled=1");
 check("cancelling at PayPal is acknowledged", await see(amna, /nothing was charged/i));
 check("cancelling grants nothing", await see(amna, /0\s*credits left/i));
 
-await amna.getByRole("button", { name: /simulated paypal checkout/i }).first().click();
+await amna.getByRole("button", { name: /pay with paypal/i }).first().click();
+await amna.getByRole("button", { name: /continue to simulated checkout/i }).click();
 await amna.waitForURL("**/api/paypal-simulator?**", { timeout: 15000 });
 await amna.getByRole("link", { name: /approve simulated payment/i }).click();
 await amna.waitForURL("**/billing/return**");

@@ -1,6 +1,7 @@
 > **Out of date on licensing.** This project is now MIT licensed, as the PayPal AI Hackathon
 > requires an open-source licence. What follows about an all-rights-reserved licence no
-> longer applies.
+> longer applies. `npm run dev` and `npm run build` no longer run the vault: it wrote old
+> encrypted copies over current files. `npm run design:unlock` still would, so do not run it.
 
 # Protecting the frontend
 

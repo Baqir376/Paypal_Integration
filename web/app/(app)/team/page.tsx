@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { PageNote, popToast } from "@/components/Pop";
 import { IconArrow } from "@/components/icons";
 import { Avatar, ErrorState, LoadingState, SectionHead } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
@@ -86,10 +87,10 @@ export default function TeamPage() {
           <h1 className="display d2" style={{ margin: 0 }}>
             Your salespeople
           </h1>
-          <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
+          <PageNote>
             Add people here, or just type a new name when you upload a call and
             they will be added for you.
-          </p>
+          </PageNote>
         </div>
       </header>
 
@@ -230,6 +231,7 @@ export default function TeamPage() {
                   setNotice("The invite was saved, but the email could not be sent. Tell them directly, or send it again.");
                 }
                 if (made) {
+                  popToast(`Invited ${inviteEmail}`);
                   setInviteEmail("");
                   setInviteRep("");
                 }
@@ -264,8 +266,8 @@ export default function TeamPage() {
               </button>
               <p style={{ flexBasis: "100%", margin: 0, fontSize: 12, color: "var(--ink-3)" }}>
                 {access.mail_enabled
-                  ? "They will get an email asking them to sign in with Google using this address."
-                  : "No email is sent, because no mail server is set up. Tell them to sign in with Google using this address."}
+                  ? "They will get an email asking them to sign in using this address."
+                  : "No email is sent, because no mail server is set up. Tell them to sign in with Google using this address, which proves it is theirs."}
               </p>
             </form>
           )}

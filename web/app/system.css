@@ -1722,17 +1722,8 @@
  * ----------------------------------------------------------------------- */
 
 /* The rail is fixed, so every product page needs the gutter. */
-.shell { padding-left: var(--rail-w); }
-
-/* The pill occupies the top centre. Both the product rail and the page body
-   start below it -- a floating nav that sits on top of a page heading is a
-   floating nav that has to be scrolled away before the page can be read. */
-.app-rail { padding-top: calc(var(--pill-h) + 22px); }
-.shell .page { padding-top: calc(var(--pill-h) + 34px); }
 
 @media (max-width: 900px) {
-  .app-rail { padding-top: calc(var(--pill-h) + 14px); }
-  .shell .page { padding-top: 26px; }
   .sx-pill-status { display: none; }
 }
 
@@ -1740,8 +1731,6 @@
   :root { --rail-w: 0px; }
   .sx-rail { display: none; }
   .sx-pill { top: auto; bottom: 14px; }
-  .app-rail { padding-top: 0; }
-  .shell .page { padding-bottom: calc(var(--pill-h) + 40px); }
   .sx-pill-nav { overflow-x: auto; scrollbar-width: none; }
   .sx-pill-nav::-webkit-scrollbar { display: none; }
 }

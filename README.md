@@ -1,6 +1,6 @@
 # Salix
 
-**Sales conversation intelligence built on Alibaba Cloud Model Studio.**
+**Sales conversation intelligence, with coaching plans and closing practice.**
 
 Salix listens to every call a sales team runs, measures what actually happened
 down to the millisecond, extracts the narrative moves that close deals, and
@@ -15,10 +15,11 @@ where it did.
 ## PayPal AI Hackathon
 
 **What is new since the submission period opened:** the credit paywall (PayPal Orders
-through the APIMatic-generated SDK, and Braintree), Google sign-in with isolated teams,
+through the APIMatic-generated SDK, and Braintree), Google or email sign-in with isolated teams,
 automatic language detection, the deal score and coaching threshold, the closing test
-roleplay, and AI failover. See [`docs/APIMATIC.md`](docs/APIMATIC.md) for how APIMatic's
-SDK and Context Plugin were used.
+roleplay, AI failover, and a Python SDK and docs portal for Salix's own API generated with
+the APIMatic CLI. See [`docs/APIMATIC.md`](docs/APIMATIC.md) for how APIMatic's SDK, Context
+Plugin and CLI were used.
 
 **To see the purchase flow with no accounts at all,** follow the Quickstart with this in
 `.env` at the repository root. Payments then run through the real SDK code against a
@@ -68,7 +69,7 @@ python -m venv .venv
 **2 — Run the test suite.** Still in `api/`:
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 1378 passed, 10 skipped
+.venv/Scripts/python -m pytest -q     # 1426 passed, 10 skipped
 ```
 
 Everything below assumes `.venv/Scripts/python` on Windows; on macOS and Linux
@@ -526,7 +527,7 @@ api/
     routers/      HTTP surface
   scripts/
     gen_types.py  compiles the Pydantic contract into web/lib/types.ts
-  tests/          1388 tests
+  tests/          1436 tests
 seed/             the corpus: cast, scripts, and the build pipeline
 web/
   app/            index, archive, console, calls, reps, playbook, deals,
@@ -574,7 +575,7 @@ cd web && npx tsc --noEmit
 - **Repair loops.** Structured output that fails validation is returned to the
   model *with the validator's complaint*; citations that name nonexistent
   segments are returned with the list of legal ids.
-- **Typed end to end**, and 1388 tests covering the metrics engine against
+- **Typed end to end**, and 1436 tests covering the metrics engine against
   hand-computed fixtures, Urdu and Roman Urdu question and backchannel
   detection, vector search, persistence round-trips, the full DAG, and every
   HTTP endpoint against a really-seeded database.

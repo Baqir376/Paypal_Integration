@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { PageNote } from "@/components/Pop";
 import { IconArrow, IconCheck, IconUpload, IconWarning } from "@/components/icons";
 import { ErrorState } from "@/components/ui";
 import { ApiError, api, subscribeToPipeline } from "@/lib/api";
@@ -196,11 +197,11 @@ export default function UploadPage() {
           <h1 className="display d2" style={{ margin: 0 }}>
             Analyse a call
           </h1>
-          <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
+          <PageNote>
             {canTranscribe === false
               ? "Six agents will measure the conversation, read its anatomy, and mine it for reusable moves — but not yours, in this configuration. See below."
               : "Drop a recording in and say whose call it is. English, Urdu or Roman Urdu is detected for you, and you get a score and a coaching plan back."}
-          </p>
+          </PageNote>
         </div>
       </header>
 

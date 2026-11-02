@@ -1,0 +1,5832 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Salix API",
+    "description": "Salix scores recorded B2B sales calls, writes a coaching plan for the weakest skills, and lets a salesperson practise against a buyer built from the deals they lost.\n\nSign in with `POST /api/auth/login` or the Google flow to receive a session cookie. A deployment may also require a shared key in the `X-API-Key` header.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Salix",
+      "url": "https://github.com/Baqir376/Paypal_Integration"
+    },
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Health",
+        "description": "Liveness plus enough state for the UI to explain itself.\n\nThe frontend shows a mode badge -- live or offline -- because a judge\nshould never have to wonder whether they are looking at real inference.",
+        "operationId": "get_health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Ready",
+        "description": "Can this process actually serve a request right now?\n\nDistinct from /health on purpose. Health says the process is alive, which\na deployment platform uses to decide whether to restart it; readiness says\nthe database answers, which is what decides whether to send traffic. A\nprocess whose database has gone away is alive and must not be given work.\n\nDeliberately cheap: one round trip, no inference, no counting. A readiness\nprobe that costs anything gets run every few seconds forever.",
+        "operationId": "get_ready",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/overview": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Overview",
+        "operationId": "get_overview",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The team's summary for the dashboard: its numbers, salespeople, risks and recent calls.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Search",
+        "description": "Semantic search across every indexed conversational moment.\n\nThis is the retrieval layer the Coach uses, exposed directly -- ask \"how\ndid anyone handle a pricing objection\" and get the passages back.",
+        "operationId": "get_search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "What to search for."
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Only moments of this kind."
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Only calls with this outcome."
+          },
+          {
+            "name": "k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 8
+            },
+            "description": "How many results to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchHit"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "description": "Public: the page has to ask this before it knows whether to show a login.",
+        "operationId": "get_auth_me",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/google/start": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Google Start",
+        "operationId": "get_auth_google_start",
+        "parameters": [
+          {
+            "name": "next",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "/console"
+            },
+            "description": "A page in this app to return to after signing in."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Redirects the browser to Google to sign in.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/google/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Google Callback",
+        "operationId": "get_auth_google_callback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "The one-time code Google returned."
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "The value sent to Google at the start, checked against the browser's cookie."
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "The error Google returned, if sign-in did not finish."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Where Google sends the browser back. Signs the person in and redirects into the app.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "post_auth_logout",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Ends this browser's session.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/signup": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Signup",
+        "operationId": "post_auth_signup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUp"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Creates an account with its own team and signs in. The address stays unconfirmed until its link is opened.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "post_auth_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Signs in with an email and password. Ten wrong tries in a row lock the password for 15 minutes.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/password/forgot": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Forgot Password",
+        "description": "The same answer whether or not there is an account, and the mail goes out after it.",
+        "operationId": "post_auth_password_forgot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/password/reset": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Reset Password",
+        "operationId": "post_auth_password_reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Sets a new password using the token from the reset email, and signs out every other browser.",
+        "security": [
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/email/verify": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verify Email",
+        "description": "Mail scanners open links before people do, so this can be opened again, and it\nconfirms the address without signing anybody in.",
+        "operationId": "get_auth_email_verify",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "The token from the email."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          },
+          {}
+        ]
+      }
+    },
+    "/api/auth/email/resend": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Resend Verification",
+        "operationId": "post_auth_email_resend",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Sends a new confirmation link, replacing the last one.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/team": {
+      "get": {
+        "tags": [
+          "team"
+        ],
+        "summary": "Team",
+        "operationId": "get_team",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The team's members and open invitations.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/team/invites": {
+      "post": {
+        "tags": [
+          "team"
+        ],
+        "summary": "Invite",
+        "description": "They join this team the first time they sign in with this address, and are\ntold by email if a mail server is configured.",
+        "operationId": "post_team_invites",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/team/invites/{invite_id}/resend": {
+      "post": {
+        "tags": [
+          "team"
+        ],
+        "summary": "Resend Invite",
+        "operationId": "post_team_invites_invite_id_resend",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The invitation's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Sends an invitation's email again. Owner only.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/team/members/{user_id}": {
+      "patch": {
+        "tags": [
+          "team"
+        ],
+        "summary": "Change Role",
+        "operationId": "patch_team_members_user_id",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The team member's id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Changes a member's role. A team must keep at least one owner. Owner only.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "team"
+        ],
+        "summary": "Remove Member",
+        "operationId": "delete_team_members_user_id",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The team member's id."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Removes a member and ends their sessions. Owner only.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/team/invites/{invite_id}": {
+      "delete": {
+        "tags": [
+          "team"
+        ],
+        "summary": "Cancel Invite",
+        "operationId": "delete_team_invites_invite_id",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The invitation's id."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Cancels an invitation. Owner only.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/team/org": {
+      "patch": {
+        "tags": [
+          "team"
+        ],
+        "summary": "Rename Org",
+        "operationId": "patch_team_org",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrgRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Renames the team. Owner only.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/calls": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "List Calls",
+        "operationId": "get_calls",
+        "parameters": [
+          {
+            "name": "rep_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "The salesperson's id."
+          },
+          {
+            "name": "deal_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "The deal's id."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100
+            },
+            "description": "The most results to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CallSummary"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The team's analysed calls, newest first, optionally filtered by salesperson or outcome.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/calls/{call_id}": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Get Call",
+        "operationId": "get_calls_call_id",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The call's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "One call in full: transcript, metrics, scorecard, analysis and evidence.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/calls/upload": {
+      "post": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Upload Call",
+        "description": "Accept a recording and start the analysis DAG.\n\nReturns 202 immediately with the call id and the SSE URL. The browser\nsubscribes to that stream and watches the graph run; nothing about the\nupload blocks on inference.",
+        "operationId": "post_calls_upload",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The audio file."
+                  },
+                  "salesperson": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Whose call this is. A new name adds them to the team.",
+                    "examples": [
+                      "Bilal Shah"
+                    ]
+                  },
+                  "rep_id": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The salesperson's id."
+                  },
+                  "title": {
+                    "type": "string",
+                    "default": "",
+                    "description": "A name for this call, such as `Bilal's Call`.",
+                    "examples": [
+                      "Bilal's Call"
+                    ]
+                  },
+                  "account": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The customer's company."
+                  },
+                  "deal_id": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The deal this belongs to."
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "default": "open",
+                    "description": "How the call turned out."
+                  },
+                  "rep_speaker_id": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Which speaker in the recording is the salesperson."
+                  },
+                  "language": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The conversation's language."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "description": "A recording to analyse, and whose call it is."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/calls/{call_id}/events": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Stream Events",
+        "description": "Server-sent events for one call's pipeline run.\n\nA heartbeat comment goes out every fifteen seconds so that proxies and\nbrowsers do not quietly close a stream during a long transcription.",
+        "operationId": "get_calls_call_id_events",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The call's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/calls/{call_id}/timeline": {
+      "get": {
+        "tags": [
+          "calls"
+        ],
+        "summary": "Stage History",
+        "description": "Whatever the pipeline has already reported, for a page reload.",
+        "operationId": "get_calls_call_id_timeline",
+        "parameters": [
+          {
+            "name": "call_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The call's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reps": {
+      "get": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Leaderboard",
+        "operationId": "get_reps",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The team's salespeople, ranked.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Add Rep",
+        "operationId": "post_reps",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Adds a salesperson to the team.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reps/archived": {
+      "get": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Archived Reps",
+        "operationId": "get_reps_archived",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Rep"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Salespeople who have been removed and can be restored.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reps/{rep_id}": {
+      "patch": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Edit Rep",
+        "operationId": "patch_reps_rep_id",
+        "parameters": [
+          {
+            "name": "rep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The salesperson's id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Edits a salesperson's details.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Remove Rep",
+        "description": "Take someone off the team. Their calls stay, and they can be restored.",
+        "operationId": "delete_reps_rep_id",
+        "parameters": [
+          {
+            "name": "rep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The salesperson's id."
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Rep Profile",
+        "operationId": "get_reps_rep_id",
+        "parameters": [
+          {
+            "name": "rep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The salesperson's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepProfile"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "A salesperson's profile: their numbers, calls, coaching plan and practice sessions.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reps/{rep_id}/restore": {
+      "post": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Restore Rep",
+        "operationId": "post_reps_rep_id_restore",
+        "parameters": [
+          {
+            "name": "rep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The salesperson's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rep"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Brings back a salesperson who was removed.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reps/{rep_id}/coach": {
+      "post": {
+        "tags": [
+          "reps"
+        ],
+        "summary": "Generate Coaching Plan",
+        "description": "Run the Coach: diagnose the gaps, retrieve from winning calls, write the\nscript. Synchronous, because the caller wants the plan, not a job id.",
+        "operationId": "post_reps_rep_id_coach",
+        "parameters": [
+          {
+            "name": "rep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The salesperson's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/plays": {
+      "get": {
+        "tags": [
+          "plays"
+        ],
+        "summary": "List Plays",
+        "operationId": "get_plays",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Winning moves mined from the team's closed calls.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/plays/{play_id}": {
+      "get": {
+        "tags": [
+          "plays"
+        ],
+        "summary": "Get Play",
+        "operationId": "get_plays_play_id",
+        "parameters": [
+          {
+            "name": "play_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The play's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "One winning move, with the transcript evidence behind it.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/deals": {
+      "get": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "List Deals",
+        "description": "Every deal with its computed trajectory.\n\nTrajectories are derived on read rather than stored, so the radar always\nreflects the most recently analysed call instead of the last time a report\nwas generated.",
+        "operationId": "get_deals",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/deals/{deal_id}": {
+      "get": {
+        "tags": [
+          "deals"
+        ],
+        "summary": "Get Deal",
+        "operationId": "get_deals_deal_id",
+        "parameters": [
+          {
+            "name": "deal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The deal's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "One deal, its calls and the risks found in them.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reports": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "List Reports",
+        "operationId": "get_reports",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The team's cycle reports.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reports/latest": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Latest Report",
+        "operationId": "get_reports_latest",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The most recent cycle report.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reports/generate": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Generate Report",
+        "description": "Aggregate the cycle and write the narrative. Runs synchronously; the\ncaller is a person who pressed a button and wants the document.",
+        "operationId": "post_reports_generate",
+        "parameters": [
+          {
+            "name": "cycle_label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "Only this sales cycle, such as `Q3 FY26`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reports/deal-calibration": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Deal Calibration",
+        "description": "Does the deal score predict this team's real outcomes?",
+        "operationId": "get_reports_deal_calibration",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Calibration"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Report",
+        "operationId": "get_reports_report_id",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The report's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "One cycle report.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/dojo/start": {
+      "post": {
+        "tags": [
+          "dojo"
+        ],
+        "summary": "Start Session",
+        "description": "Build the persona from this rep's own failures and open a session.",
+        "operationId": "post_dojo_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/dojo/turn": {
+      "post": {
+        "tags": [
+          "dojo"
+        ],
+        "summary": "Take Turn",
+        "description": "Stream the buyer's reply, then the coach nudges and updated session.\n\nThe response is a single SSE stream carrying three event types so the\nclient makes one request per turn: `delta` while the buyer speaks, then\n`nudge`s, then the authoritative `session` state.",
+        "operationId": "post_dojo_turn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/dojo/end": {
+      "post": {
+        "tags": [
+          "dojo"
+        ],
+        "summary": "End Session",
+        "description": "Score the session on the same engine that scores real calls.",
+        "operationId": "post_dojo_end",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/dojo/transcribe": {
+      "post": {
+        "tags": [
+          "dojo"
+        ],
+        "summary": "Transcribe Turn",
+        "description": "Transcribe one recorded turn with Qwen ASR.\n\nSingle speaker and a few seconds long, so diarization is off and the\nfast model is used.",
+        "operationId": "post_dojo_transcribe",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The audio file."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "description": "A short recording of the salesperson speaking."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/dojo/voice": {
+      "get": {
+        "tags": [
+          "dojo"
+        ],
+        "summary": "Voice",
+        "description": "Free neural speech, in a woman's voice.\n\nSeparate from /speak, which renders the buyer through Qwen TTS and needs a\nkey. This one needs nothing, and it is the only path here that can say an\nUrdu sentence at all -- no Qwen TTS model supports Urdu, and Windows ships\nno Urdu voice unless somebody installs the language pack.\n\nA GET with the text in the query string, because the browser plays it by\nhanding the URL to an <audio> element, and an <audio> element cannot POST.\n\n`lang` is the caller's own tag -- the one it hands to speech recognition --\nand the provider maps it to a voice. Passing `en-PK` for Roman Urdu used to\nfall through to the English voice, so the reply came back British.",
+        "operationId": "get_dojo_voice",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The words to speak."
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": ""
+            },
+            "description": "The language to speak in."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/dojo/speak": {
+      "post": {
+        "tags": [
+          "dojo"
+        ],
+        "summary": "Speak",
+        "description": "Render the buyer's line with Qwen TTS.",
+        "operationId": "post_dojo_speak",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The words to speak."
+          },
+          {
+            "name": "voice",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "Jennifer"
+            },
+            "description": "The name of the voice to use."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/dojo/sessions": {
+      "get": {
+        "tags": [
+          "dojo"
+        ],
+        "summary": "List Sessions",
+        "operationId": "get_dojo_sessions",
+        "parameters": [
+          {
+            "name": "rep_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "The salesperson's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Past practice sessions, optionally for one salesperson.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/billing": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "State",
+        "operationId": "get_billing",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "The credit balance, the packs on sale, the payment provider and the credit history.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/billing/checkout": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Checkout",
+        "operationId": "post_billing_checkout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Creates a PayPal order for a pack through APIMatic's PayPal Server SDK, and returns the address where the buyer approves it.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/billing/orders/{order_id}/capture": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Capture",
+        "description": "Called by the return page. Safe to call any number of times.\n\nOnly an order this server created can be captured. An id we have no row for\nnever reaches PayPal, so nobody can turn somebody else's payment into credits.",
+        "operationId": "post_billing_orders_order_id_capture",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The payment order's id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/billing/reconcile": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Reconcile",
+        "description": "Catch up on orders that never came back through the return page.",
+        "operationId": "post_billing_reconcile",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/billing/braintree/client-token": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Braintree Client Token",
+        "description": "Lets Braintree's own payment form open in the browser.",
+        "operationId": "post_billing_braintree_client_token",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/billing/braintree/pay": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Braintree Pay",
+        "operationId": "post_billing_braintree_pay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BraintreePayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Charges a pack through Braintree, using a payment method nonce from Braintree's form.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/api/roleplay/start": {
+      "post": {
+        "tags": [
+          "roleplay"
+        ],
+        "summary": "Start",
+        "operationId": "post_roleplay_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleplayStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Starts the closing test for a salesperson's coaching plan.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/audio/{name}": {
+      "get": {
+        "tags": [
+          "audio"
+        ],
+        "summary": "Recording",
+        "operationId": "get__audio_name",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The recording's file name."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the API key is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There is no such record, or it belongs to another team.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the time in the `Retry-After` header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "description": "Streams a call recording that belongs to the signed-in team.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BandResult": {
+        "properties": {
+          "band": {
+            "type": "string",
+            "description": "The range of deal scores this covers."
+          },
+          "calls": {
+            "type": "integer",
+            "description": "How many calls scored in this band."
+          },
+          "won": {
+            "type": "integer",
+            "description": "How many calls were won."
+          },
+          "win_rate": {
+            "description": "The share of these calls that were won, from 0 to 1.",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "band",
+          "calls",
+          "won"
+        ],
+        "title": "BandResult",
+        "description": "How calls in one score band actually turned out."
+      },
+      "BillingState": {
+        "properties": {
+          "enforced": {
+            "type": "boolean",
+            "description": "Whether uploads use credits on this server."
+          },
+          "can_purchase": {
+            "type": "boolean",
+            "description": "Whether this server can take payments."
+          },
+          "simulated": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether payments are simulated, so that no money moves."
+          },
+          "provider": {
+            "description": "Who takes the payment: `paypal`, `braintree` or `simulator`.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "can_buy": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this person may buy credits."
+          },
+          "environment": {
+            "type": "string",
+            "description": "`sandbox` or `production`."
+          },
+          "balance": {
+            "type": "integer",
+            "description": "The credits the team has now."
+          },
+          "call_cost": {
+            "type": "integer",
+            "default": 1,
+            "description": "How many credits one recording uses."
+          },
+          "packs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The packs on sale."
+          },
+          "history": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The credits added and spent."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enforced",
+          "can_purchase",
+          "environment",
+          "balance"
+        ],
+        "title": "BillingState",
+        "description": "A team's credits and what it can buy."
+      },
+      "BraintreePayRequest": {
+        "properties": {
+          "pack_id": {
+            "type": "string",
+            "description": "The pack to buy.",
+            "examples": [
+              "starter"
+            ]
+          },
+          "nonce": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "description": "The one-time payment method reference from Braintree's form."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pack_id",
+          "nonce"
+        ],
+        "title": "BraintreePayRequest",
+        "description": "A Braintree payment for a pack."
+      },
+      "BuyerPersona": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The persona's id."
+          },
+          "name": {
+            "type": "string",
+            "description": "The buyer's name."
+          },
+          "title": {
+            "type": "string",
+            "description": "The buyer's job title."
+          },
+          "company": {
+            "type": "string",
+            "description": "The buyer's company."
+          },
+          "disposition": {
+            "type": "string",
+            "description": "e.g. guarded, time-poor, data-driven"
+          },
+          "context": {
+            "type": "string",
+            "description": "What they know and want going in"
+          },
+          "objections": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaObjection"
+            },
+            "type": "array",
+            "description": "The objections this buyer raises."
+          },
+          "voice": {
+            "type": "string",
+            "description": "TTS voice id",
+            "default": ""
+          },
+          "voice_instruction": {
+            "type": "string",
+            "description": "Prosody control passed to Qwen TTS",
+            "default": ""
+          },
+          "derived_from_call_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "description": "The calls this persona was built from."
+          },
+          "difficulty": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "default": 2,
+            "description": "How hard the buyer is to convince."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "title",
+          "company",
+          "disposition",
+          "context"
+        ],
+        "title": "BuyerPersona",
+        "description": "A buyer built from objections in a salesperson's lost and stalled deals."
+      },
+      "Calibration": {
+        "properties": {
+          "decided": {
+            "type": "integer",
+            "description": "How many calls have a won or lost outcome."
+          },
+          "won": {
+            "type": "integer",
+            "description": "How many calls were won."
+          },
+          "lost": {
+            "type": "integer",
+            "description": "How many calls were lost."
+          },
+          "separation": {
+            "description": "The chance a won call outscores a lost one. 0.5 is a coin toss and 1.0 is perfect.",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reliable": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether there are enough decided calls to trust this."
+          },
+          "verdict": {
+            "type": "string",
+            "default": "",
+            "description": "The result in plain words."
+          },
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/BandResult"
+            },
+            "type": "array",
+            "default": [],
+            "description": "Real outcomes for each range of scores."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decided",
+          "won",
+          "lost"
+        ],
+        "title": "Calibration",
+        "description": "Whether the deal score predicts this team's real outcomes."
+      },
+      "CallDetailResponse": {
+        "properties": {
+          "call": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "The call's summary."
+          },
+          "rep_name": {
+            "type": "string",
+            "default": "",
+            "description": "The salesperson's name."
+          },
+          "deal": {
+            "description": "The deal this call belongs to, if any.",
+            "oneOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transcript": {
+            "description": "The conversation, line by line.",
+            "oneOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metrics": {
+            "description": "The measurements taken from the conversation.",
+            "oneOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scorecard": {
+            "description": "The call's scores for each skill.",
+            "oneOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "analysis": {
+            "description": "The analysis of the conversation.",
+            "oneOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plays": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "default": [],
+            "description": "Plays found in this call."
+          },
+          "citation_coverage": {
+            "type": "number",
+            "default": 0.0,
+            "description": "How much of the analysis cites the transcript, from 0 to 1."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "call"
+        ],
+        "title": "CallDetailResponse",
+        "description": "Everything known about one call."
+      },
+      "CallSummary": {
+        "properties": {
+          "call": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "The call's summary."
+          },
+          "rep_name": {
+            "type": "string",
+            "default": "",
+            "description": "The salesperson's name."
+          },
+          "score": {
+            "description": "The deal score, out of 100.",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "talk_ratio_rep": {
+            "description": "How much of the talking the salesperson did, from 0 to 1.",
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "longest_monologue_ms": {
+            "description": "The salesperson's longest unbroken speech, in milliseconds.",
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "headline": {
+            "type": "string",
+            "default": "",
+            "description": "The call in one line."
+          },
+          "open_objections": {
+            "type": "integer",
+            "default": 0,
+            "description": "How many objections were never resolved."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "call"
+        ],
+        "title": "CallSummary",
+        "description": "One call in a list."
+      },
+      "CheckoutRequest": {
+        "properties": {
+          "pack_id": {
+            "type": "string",
+            "description": "The pack to buy.",
+            "examples": [
+              "starter"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pack_id"
+        ],
+        "title": "CheckoutRequest",
+        "description": "The pack to buy."
+      },
+      "CheckoutResponse": {
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "The payment order's id."
+          },
+          "approve_url": {
+            "type": "string",
+            "description": "Send the buyer here to approve the payment."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "order_id",
+          "approve_url"
+        ],
+        "title": "CheckoutResponse",
+        "description": "A created order and where to approve it."
+      },
+      "ClosingAssessment": {
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "description": "Whether the salesperson could close this deal now."
+          },
+          "deal_closed": {
+            "type": "boolean",
+            "description": "Whether the buyer committed."
+          },
+          "close_evidence": {
+            "type": "string",
+            "default": "",
+            "description": "The transcript line showing the buyer committed."
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/GapResult"
+            },
+            "type": "array",
+            "description": "Each skill from the plan, and whether it was shown."
+          },
+          "next_focus": {
+            "type": "string",
+            "default": "",
+            "description": "What to work on next."
+          },
+          "summary": {
+            "type": "string",
+            "default": "",
+            "description": "The result in a sentence or two."
+          },
+          "judged_by": {
+            "type": "string",
+            "default": "model",
+            "description": "`model`, or `measurements` if no judge was available. The second can never report a closed deal."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ready",
+          "deal_closed"
+        ],
+        "title": "ClosingAssessment",
+        "description": "Could this rep close the deal now?"
+      },
+      "CoachNudge": {
+        "properties": {
+          "at_turn": {
+            "type": "integer",
+            "description": "The turn this was shown at."
+          },
+          "kind": {
+            "type": "string",
+            "description": "play | warning | praise"
+          },
+          "title": {
+            "type": "string",
+            "description": "The hint in a few words."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The hint in full."
+          },
+          "play_id": {
+            "description": "The play this relates to.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "at_turn",
+          "kind",
+          "title",
+          "detail"
+        ],
+        "title": "CoachNudge",
+        "description": "A live hint on the coach rail. Fired mid-session, never after."
+      },
+      "DojoScore": {
+        "properties": {
+          "overall": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "description": "The overall score, out of 100."
+          },
+          "axes": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/SkillAxis"
+            },
+            "type": "object",
+            "description": "A score out of 100 for each skill."
+          },
+          "objections_faced": {
+            "type": "integer",
+            "default": 0,
+            "description": "How many objections came up."
+          },
+          "objections_handled": {
+            "type": "integer",
+            "default": 0,
+            "description": "How many of them were handled."
+          },
+          "plays_landed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "description": "Plays the salesperson used well."
+          },
+          "plays_missed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "description": "Plays the salesperson could have used."
+          },
+          "verdict": {
+            "type": "string",
+            "default": "",
+            "description": "The result in plain words."
+          },
+          "talk_ratio_rep": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "default": 0.0,
+            "description": "How much of the talking the salesperson did, from 0 to 1."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "overall"
+        ],
+        "title": "DojoScore",
+        "description": "How a practice session went."
+      },
+      "DojoSession": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The session's id."
+          },
+          "rep_id": {
+            "type": "string",
+            "description": "The salesperson's id."
+          },
+          "persona": {
+            "$ref": "#/components/schemas/BuyerPersona",
+            "description": "The buyer in this session."
+          },
+          "language": {
+            "type": "string",
+            "default": "en",
+            "description": "The conversation's language."
+          },
+          "scenario": {
+            "type": "string",
+            "default": "",
+            "description": "The situation being practised."
+          },
+          "started_at": {
+            "type": "string",
+            "default": "",
+            "description": "When the session started."
+          },
+          "ended_at": {
+            "description": "When the session ended.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/DojoTurn"
+            },
+            "type": "array",
+            "description": "What was said."
+          },
+          "nudges": {
+            "items": {
+              "$ref": "#/components/schemas/CoachNudge"
+            },
+            "type": "array",
+            "description": "Coaching hints shown during the session."
+          },
+          "score": {
+            "description": "How the session went, once it has ended.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DojoScore"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "default": "practice",
+            "description": "Whether this is free practice or a closing test."
+          },
+          "plan_id": {
+            "description": "The coaching plan this tests.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "brief": {
+            "type": "string",
+            "default": "",
+            "description": "What the salesperson is told before starting."
+          },
+          "assessment": {
+            "description": "The closing test's result, once it has ended.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ClosingAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "rep_id",
+          "persona"
+        ],
+        "title": "DojoSession",
+        "description": "A practice session against a buyer persona."
+      },
+      "DojoTurn": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "This line's position in the session."
+          },
+          "speaker": {
+            "type": "string",
+            "description": "rep | buyer"
+          },
+          "text": {
+            "type": "string",
+            "description": "What was said."
+          },
+          "start_ms": {
+            "type": "integer",
+            "default": 0,
+            "description": "When this line started, in milliseconds."
+          },
+          "end_ms": {
+            "type": "integer",
+            "default": 0,
+            "description": "When this line ended, in milliseconds."
+          },
+          "audio_url": {
+            "description": "Where to fetch this line's audio, if it has any.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "speaker",
+          "text"
+        ],
+        "title": "DojoTurn",
+        "description": "One line spoken in a practice session."
+      },
+      "EndRequest": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/DojoSession",
+            "description": "The server-held session's id."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session"
+        ],
+        "title": "EndRequest",
+        "description": "The practice session to end."
+      },
+      "ForgotPassword": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "default": "",
+            "description": "The account's address.",
+            "examples": [
+              "amna@acme.com"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ForgotPassword",
+        "description": "The address to send a reset link to."
+      },
+      "GapResult": {
+        "properties": {
+          "axis": {
+            "$ref": "#/components/schemas/SkillAxis",
+            "description": "The skill being judged."
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Whether this skill was shown."
+          },
+          "evidence": {
+            "type": "string",
+            "default": "",
+            "description": "The transcript evidence for this."
+          },
+          "feedback": {
+            "type": "string",
+            "default": "",
+            "description": "What to do differently."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "axis",
+          "passed"
+        ],
+        "title": "GapResult",
+        "description": "Whether one skill from the coaching plan was shown."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "description": "Each field that was not accepted."
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError",
+        "description": "The request did not match what this operation accepts."
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "`ok` when the server is healthy."
+          },
+          "provider_mode": {
+            "type": "string",
+            "description": "Whether real models or the offline stand-ins are answering."
+          },
+          "models": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "description": "The model used for each job."
+          },
+          "providers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "default": {},
+            "description": "Which service does each job."
+          },
+          "seeded": {
+            "type": "boolean",
+            "description": "Whether the database holds the demo data."
+          },
+          "calls": {
+            "type": "integer",
+            "description": "How many calls are in the archive."
+          },
+          "plays": {
+            "type": "integer",
+            "description": "How many plays are in the archive."
+          },
+          "moments": {
+            "type": "integer",
+            "description": "How many moments are in the archive."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "provider_mode",
+          "models",
+          "seeded",
+          "calls",
+          "plays",
+          "moments"
+        ],
+        "title": "Health",
+        "description": "Whether the server is up, and what it is running on."
+      },
+      "InviteOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The invitation's id."
+          },
+          "email": {
+            "type": "string",
+            "description": "The invited address."
+          },
+          "role": {
+            "type": "string",
+            "description": "`owner` or `member`."
+          },
+          "rep_id": {
+            "description": "The salesperson's id.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email_sent": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the mail server accepted the email for this request. It is not a delivery receipt."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "role"
+        ],
+        "title": "InviteOut",
+        "description": "An invitation to join a team."
+      },
+      "InviteRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "description": "An email address.",
+            "examples": [
+              "sana@acme.com"
+            ]
+          },
+          "rep_id": {
+            "description": "The salesperson's id.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "InviteRequest",
+        "description": "Who to invite."
+      },
+      "LogIn": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "default": "",
+            "description": "An email address.",
+            "examples": [
+              "amna@acme.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 4096,
+            "default": "",
+            "description": "The password, from 10 to 128 characters when it is being set."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LogIn",
+        "description": "An email and password."
+      },
+      "Me": {
+        "properties": {
+          "auth_required": {
+            "type": "boolean",
+            "description": "Whether this server needs people to sign in."
+          },
+          "google_enabled": {
+            "type": "boolean",
+            "description": "Whether Google sign-in is available."
+          },
+          "mail_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this server can send email."
+          },
+          "user": {
+            "description": "Who is signed in, if anyone.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "auth_required",
+          "google_enabled"
+        ],
+        "title": "Me",
+        "description": "Whether this server needs sign-in, and who is signed in."
+      },
+      "ObjectionCategory": {
+        "type": "string",
+        "enum": [
+          "price",
+          "timing",
+          "authority",
+          "competition",
+          "status_quo",
+          "trust",
+          "fit",
+          "risk",
+          "other"
+        ],
+        "title": "ObjectionCategory",
+        "description": "The kind of objection a buyer raises."
+      },
+      "OrderResult": {
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "The payment order's id."
+          },
+          "status": {
+            "type": "string",
+            "description": "`completed` once the credits are added."
+          },
+          "credits": {
+            "type": "integer",
+            "description": "How many credits this order added."
+          },
+          "balance": {
+            "type": "integer",
+            "description": "The credits the team has now."
+          },
+          "detail": {
+            "type": "string",
+            "default": "",
+            "description": "Why the credits were not added, if they were not."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "order_id",
+          "status",
+          "credits",
+          "balance"
+        ],
+        "title": "OrderResult",
+        "description": "What happened to a payment order."
+      },
+      "OrgRename": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "description": "The team's new name.",
+            "examples": [
+              "Acme sales"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "OrgRename",
+        "description": "The team's new name."
+      },
+      "Overview": {
+        "properties": {
+          "org": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "The team's details."
+          },
+          "team": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "The team's totals."
+          },
+          "reps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The team's salespeople."
+          },
+          "recent_calls": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The latest calls."
+          },
+          "risks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "Deals most at risk."
+          },
+          "top_plays": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The most effective plays."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "org",
+          "team",
+          "reps",
+          "recent_calls",
+          "risks",
+          "top_plays"
+        ],
+        "title": "Overview",
+        "description": "Everything the command centre needs, in one request."
+      },
+      "PersonaObjection": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/ObjectionCategory",
+            "description": "The kind of objection."
+          },
+          "text": {
+            "type": "string",
+            "description": "What the buyer says."
+          },
+          "from_call_id": {
+            "description": "The call this objection came from.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hardness": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "default": 0.5,
+            "description": "How badly this objection was handled in real calls, from 0 to 1."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "text"
+        ],
+        "title": "PersonaObjection",
+        "description": "One objection a buyer persona raises, and the call it came from."
+      },
+      "ReconcileResult": {
+        "properties": {
+          "checked": {
+            "type": "integer",
+            "description": "How many open orders were checked."
+          },
+          "balance": {
+            "type": "integer",
+            "description": "The credits the team has now."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "checked",
+          "balance"
+        ],
+        "title": "ReconcileResult",
+        "description": "How many open orders were checked with the payment provider."
+      },
+      "Rep": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The salesperson's id."
+          },
+          "org_id": {
+            "type": "string",
+            "description": "The team's id."
+          },
+          "name": {
+            "type": "string",
+            "description": "The salesperson's name."
+          },
+          "role": {
+            "type": "string",
+            "default": "ae",
+            "description": "`owner` or `member`."
+          },
+          "initials": {
+            "type": "string",
+            "default": "",
+            "description": "The salesperson's initials."
+          },
+          "quota": {
+            "type": "number",
+            "default": 0.0,
+            "description": "The salesperson's target."
+          },
+          "attained": {
+            "type": "number",
+            "default": 0.0,
+            "description": "How much of the quota has been reached."
+          },
+          "joined_at": {
+            "type": "string",
+            "default": "",
+            "description": "When this salesperson joined."
+          },
+          "is_top_performer": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this salesperson is among the team's best."
+          },
+          "archived": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this salesperson has been removed."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "name"
+        ],
+        "title": "Rep",
+        "description": "A salesperson."
+      },
+      "RepCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The salesperson's name.",
+            "examples": [
+              "Zara Ahmed"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "default": "ae",
+            "description": "`owner` or `member`."
+          },
+          "quota": {
+            "type": "number",
+            "minimum": 0.0,
+            "default": 0.0,
+            "description": "The salesperson's target."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RepCreate",
+        "description": "A salesperson to add."
+      },
+      "RepProfile": {
+        "properties": {
+          "snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "The salesperson's numbers."
+          },
+          "calls": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "This salesperson's calls."
+          },
+          "coaching_plan": {
+            "description": "The salesperson's current coaching plan, if they have one.",
+            "oneOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plays_used": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "default": [],
+            "description": "Plays this salesperson has used."
+          },
+          "dojo_sessions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "default": [],
+            "description": "The salesperson's practice sessions."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "snapshot",
+          "calls"
+        ],
+        "title": "RepProfile",
+        "description": "A salesperson and everything known about them."
+      },
+      "RepUpdate": {
+        "properties": {
+          "name": {
+            "description": "The salesperson's new name.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "description": "`owner` or `member`.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quota": {
+            "description": "The salesperson's target.",
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RepUpdate",
+        "description": "The changes to make to a salesperson."
+      },
+      "ResetPassword": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 256,
+            "default": "",
+            "description": "The token from the email."
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 4096,
+            "default": "",
+            "description": "The password, from 10 to 128 characters when it is being set."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ResetPassword",
+        "description": "A reset token and the new password."
+      },
+      "RoleChange": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "`owner` or `member`.",
+            "examples": [
+              "member"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "RoleChange",
+        "description": "A member's new role."
+      },
+      "RoleplayStart": {
+        "properties": {
+          "rep_id": {
+            "type": "string",
+            "description": "The salesperson's id."
+          },
+          "language": {
+            "type": "string",
+            "default": "en",
+            "description": "The conversation's language."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rep_id"
+        ],
+        "title": "RoleplayStart",
+        "description": "The closing test to start."
+      },
+      "SearchHit": {
+        "properties": {
+          "moment": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "The moment in a call that matched."
+          },
+          "score": {
+            "type": "number",
+            "description": "How closely this matched, higher being closer."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "moment",
+          "score"
+        ],
+        "title": "SearchHit",
+        "description": "One search result."
+      },
+      "SignUp": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "default": "",
+            "description": "The person's name.",
+            "examples": [
+              "Amna Khan"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "default": "",
+            "description": "An email address.",
+            "examples": [
+              "amna@acme.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 4096,
+            "default": "",
+            "description": "The password, from 10 to 128 characters when it is being set."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SignUp",
+        "description": "A new account's details."
+      },
+      "SkillAxis": {
+        "type": "string",
+        "enum": [
+          "listening",
+          "discovery",
+          "storytelling",
+          "objection_handling",
+          "pace_and_presence",
+          "closing"
+        ],
+        "title": "SkillAxis",
+        "description": "The six axes of the rep radar. Each maps to a deterministic sub-score\nplus, where relevant, an LLM-judged component."
+      },
+      "StartRequest": {
+        "properties": {
+          "rep_id": {
+            "type": "string",
+            "description": "The salesperson's id."
+          },
+          "difficulty": {
+            "type": "integer",
+            "default": 2,
+            "description": "How hard the buyer is to convince."
+          },
+          "scenario": {
+            "type": "string",
+            "default": "",
+            "description": "The situation being practised."
+          },
+          "language": {
+            "type": "string",
+            "default": "en",
+            "description": "The conversation's language."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rep_id"
+        ],
+        "title": "StartRequest",
+        "description": "The practice session to start."
+      },
+      "TeamOut": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/UserOut"
+            },
+            "type": "array",
+            "description": "The people on the team."
+          },
+          "invites": {
+            "items": {
+              "$ref": "#/components/schemas/InviteOut"
+            },
+            "type": "array",
+            "description": "Invitations not yet accepted."
+          },
+          "can_manage": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this person may manage the team."
+          },
+          "mail_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether this server can send email."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TeamOut",
+        "description": "A team's members and invitations."
+      },
+      "TurnRequest": {
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/DojoSession",
+            "description": "The server-held session's id."
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 20000,
+            "default": "",
+            "description": "What the salesperson said."
+          },
+          "start_ms": {
+            "description": "When this line started, in milliseconds.",
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_ms": {
+            "description": "When this line ended, in milliseconds.",
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session"
+        ],
+        "title": "TurnRequest",
+        "description": "One line the salesperson said in a practice session."
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The person's id."
+          },
+          "email": {
+            "type": "string",
+            "description": "An email address."
+          },
+          "name": {
+            "type": "string",
+            "description": "The person's name."
+          },
+          "picture": {
+            "type": "string",
+            "default": "",
+            "description": "The address of the person's picture, if they have one."
+          },
+          "role": {
+            "type": "string",
+            "description": "`owner` or `member`."
+          },
+          "rep_id": {
+            "description": "The salesperson's id.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "org_id": {
+            "type": "string",
+            "description": "The team's id."
+          },
+          "org_name": {
+            "type": "string",
+            "default": "",
+            "description": "The team's name."
+          },
+          "email_verified": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this person has proved the address is theirs."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "org_id"
+        ],
+        "title": "UserOut",
+        "description": "A person who can sign in."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "description": "Where in the request the problem is."
+          },
+          "msg": {
+            "type": "string",
+            "description": "What was wrong."
+          },
+          "type": {
+            "type": "string",
+            "description": "The kind of problem."
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "description": "One field that was not accepted."
+      },
+      "ApiError": {
+        "type": "object",
+        "title": "ApiError",
+        "description": "What every failed request returns.",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "What went wrong, written for a person to read."
+          },
+          "error": {
+            "type": "string",
+            "description": "A short machine-readable code, where there is one."
+          },
+          "retryable": {
+            "type": "boolean",
+            "description": "Whether trying again later could work."
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "salix_session",
+        "description": "Set when you sign in."
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "The deployment's shared key, if it has one."
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "A local Salix server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "audio",
+      "description": "Call recordings."
+    },
+    {
+      "name": "auth",
+      "description": "Signing in and out, and confirming an email address."
+    },
+    {
+      "name": "billing",
+      "description": "Credit balance, packs and buying credits with PayPal or Braintree."
+    },
+    {
+      "name": "calls",
+      "description": "Uploading recordings and reading their analysis."
+    },
+    {
+      "name": "deals",
+      "description": "Deals and the risks found in their calls."
+    },
+    {
+      "name": "dojo",
+      "description": "Practising against a buyer built from lost deals."
+    },
+    {
+      "name": "meta",
+      "description": "The dashboard summary, search, and whether the server is up."
+    },
+    {
+      "name": "plays",
+      "description": "Winning moves taken from calls that closed."
+    },
+    {
+      "name": "reports",
+      "description": "Reports covering a sales cycle."
+    },
+    {
+      "name": "reps",
+      "description": "Salespeople and how they are doing."
+    },
+    {
+      "name": "roleplay",
+      "description": "The closing test at the end of a coaching plan."
+    },
+    {
+      "name": "team",
+      "description": "The people on a team, and invitations to join it."
+    }
+  ]
+}

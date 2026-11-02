@@ -35,6 +35,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
+import { PageNote } from "@/components/Pop";
 import { ScoreRing } from "@/components/charts";
 import {
   IconArrow,
@@ -373,17 +374,12 @@ function Dojo() {
               </>
             )}
           </h1>
-          {closingTest && (
-            <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
-              Use what your coaching plan taught you. The buyer only commits once
-              you have shown it, and you have to ask.
-            </p>
-          )}
-          <p className="lede" style={{ marginTop: 12, marginBottom: 0 }}>
-            This persona is not invented. Its objections are lifted from the
-            calls in this rep's own lost and stalled deals, weighted by how
-            badly each one was handled.
-          </p>
+          <PageNote>
+            {closingTest &&
+              "Use what your coaching plan taught you. The buyer only commits once you have shown it, and you have to ask. "}
+            This persona is not invented. Its objections are lifted from the calls in this rep's own lost and
+            stalled deals, weighted by how badly each one was handled.
+          </PageNote>
         </div>
       </header>
 

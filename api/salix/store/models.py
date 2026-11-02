@@ -202,7 +202,11 @@ class PaymentOrderRow(Base):
 
 
 class UserRow(Base):
-    """A person who can sign in. Keyed on Google's `sub`, which never changes."""
+    """A person who can sign in. Keyed on Google's `sub`, which never changes.
+
+    Somebody who signed up with a password holds a placeholder there, starting
+    `password:`, until they first sign in with Google.
+    """
 
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -216,6 +220,31 @@ class UserRow(Base):
     rep_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_login_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class PasswordRow(Base):
+    """A person's password. `verified` is whether they have proved the address is theirs,
+    and invitations and ownership are matched on address, so nothing depends on an
+    address until it is true."""
+
+    __tablename__ = "passwords"
+    user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    hash: Mapped[str] = mapped_column(String(255))
+    verified: Mapped[bool] = mapped_column(default=False)
+    failed_attempts: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class EmailTokenRow(Base):
+    """A link sent by email. Only the hash is kept, as with sessions."""
+
+    __tablename__ = "email_tokens"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    purpose: Mapped[str] = mapped_column(String(16))
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
 
 
 class SessionRow(Base):

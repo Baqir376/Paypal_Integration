@@ -375,6 +375,9 @@ class TestEveryRouteIsGuarded:
     PUBLIC = {
         "/api/health", "/api/ready", "/api/auth/me", "/api/auth/google/start",
         "/api/auth/google/callback", "/api/auth/logout",
+        # How somebody without a session gets one.
+        "/api/auth/signup", "/api/auth/login", "/api/auth/password/forgot",
+        "/api/auth/password/reset", "/api/auth/email/verify",
         # PayPal is the caller. Refused without a valid signature: see test_hardening.
         "/api/billing/webhook",
     }

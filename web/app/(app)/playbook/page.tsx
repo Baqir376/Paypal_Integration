@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { PageNote } from "@/components/Pop";
 import { IconArrow, IconSpark } from "@/components/icons";
 import { ErrorState, LoadingState } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
@@ -52,11 +53,11 @@ export default function PlaybookPage() {
             <br />
             actually do
           </h1>
-          <p className="lede" style={{ marginTop: 14, marginBottom: 0 }}>
+          <PageNote>
             Not advice. These are narrative moves lifted out of calls that
             closed, with the transcript to prove each one and the names of the
             people who ran them.
-          </p>
+          </PageNote>
         </div>
       </header>
 

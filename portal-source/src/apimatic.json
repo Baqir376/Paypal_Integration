@@ -1,0 +1,50 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": {
+      "name": "Salix API",
+      "description": "Score sales calls, write coaching plans and practise closing, through the Salix API."
+    },
+    "brand": {
+      "logo": {
+        "light": "static/images/salix-logo.png",
+        "dark": "static/images/salix-logo-dark.png"
+      },
+      "favicon": "static/images/favicon.ico",
+      "colors": {
+        "primary": {
+          "light": "#5f7209",
+          "dark": "#d4f55a"
+        }
+      },
+      "colorMode": "both"
+    },
+    "navigation": {
+      "links": [
+        {
+          "label": "GitHub",
+          "url": "https://github.com/Baqir376/Paypal_Integration"
+        }
+      ]
+    },
+    "ai": {
+      "pageActions": true
+    }
+  },
+  "languages": {
+    "csharp": {},
+    "typescript": {},
+    "python": {}
+  },
+  "plugin": {
+    "pluginId": "salix-api",
+    "pluginName": "Salix API",
+    "pluginVersion": "0.1.0",
+    "license": "MIT",
+    "author": {
+      "name": "Baqir Raza"
+    },
+    "repository": "https://github.com/Baqir376/Paypal_Integration"
+  }
+}

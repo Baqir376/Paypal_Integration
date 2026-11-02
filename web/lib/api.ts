@@ -12,6 +12,7 @@
 import type {
   DealCalibration,
   Me,
+  User,
   TeamState,
   TeamInvite,
   BillingState,
@@ -143,6 +144,15 @@ export const api = {
   health: () => request<Health>("/api/health"),
   me: () => request<Me>("/api/auth/me"),
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+  signup: (name: string, email: string, password: string) =>
+    request<User>("/api/auth/signup", { method: "POST", body: JSON.stringify({ name, email, password }) }),
+  login: (email: string, password: string) =>
+    request<User>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  forgotPassword: (email: string) =>
+    request<{ sent: boolean }>("/api/auth/password/forgot", { method: "POST", body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, password: string) =>
+    request<User>("/api/auth/password/reset", { method: "POST", body: JSON.stringify({ token, password }) }),
+  resendVerification: () => request<{ sent: boolean }>("/api/auth/email/resend", { method: "POST" }),
 
   team: () => request<TeamState>("/api/team"),
   invite: (email: string, rep_id?: string) =>

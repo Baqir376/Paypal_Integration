@@ -44,7 +44,8 @@ import { api } from "@/lib/api";
 import { TEST_COUNT } from "@/lib/facts";
 import { percent } from "@/lib/format";
 import { scrollTo } from "@/lib/motion";
-import type { CallDetailResponse, Health, Overview } from "@/lib/types";
+import SAMPLE_CALL from "@/lib/sample-call.json";
+import type { CallDetailResponse, Health, Me, Overview } from "@/lib/types";
 
 /* ==========================================================================
    Content
@@ -195,28 +196,34 @@ const PRINCIPLES: Slide[] = [
 export default function LandingPage() {
   const [health, setHealth] = useState<Health | null>(null);
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [demo, setDemo] = useState<CallDetailResponse | null>(null);
+  const [ownCall, setDemo] = useState<CallDetailResponse | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
+  const demo = ownCall ?? (SAMPLE_CALL as unknown as CallDetailResponse);
+  const stranger = !!me?.auth_required && !me.user;
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => {});
-    // The marketing page is public. With accounts on these are refused, and the
-    // page falls back to what it shows with no data, so it must not be sent to login.
-    api.me().then((me) => {
-      if (me.auth_required && !me.user) return;
-      api.overview().then(setOverview).catch(() => {});
-    }).catch(() => {});
-
-    // The evidence section renders a genuine analysed call rather than mock
-    // geometry. A screenshot of a chart is a claim; a live render is proof.
+    // The homepage is public, and a refused request sends the browser to log in. So
+    // nothing private is even asked for until it is known who is reading.
     api
-      .calls({ limit: 20 })
-      .then((calls) => {
-        const best =
-          calls.find((c) => (c.score ?? 0) > 60 && c.call.outcome === "won") ??
-          calls[0];
-        if (best) return api.call(best.call.id);
+      .me()
+      .then((me) => {
+        setMe(me);
+        if (me.auth_required && !me.user) return;
+        api.overview().then(setOverview).catch(() => {});
+
+        // Somebody with their own calls sees one of those in the evidence section.
+        api
+          .calls({ limit: 20 })
+          .then((calls) => {
+            const best =
+              calls.find((c) => (c.score ?? 0) > 60 && c.call.outcome === "won") ??
+              calls[0];
+            if (best) return api.call(best.call.id);
+          })
+          .then((detail) => detail && setDemo(detail))
+          .catch(() => {});
       })
-      .then((detail) => detail && setDemo(detail))
       .catch(() => {});
   }, []);
 
@@ -274,10 +281,7 @@ export default function LandingPage() {
           >
             <Mark size={26} />
             <span className="sx-tag sx-tag-gold">[ SALIX ]</span>
-            <span className="sx-tag">
-              [ {badge} ]
-            </span>
-            <span className="sx-tag">[ {TEST_COUNT} TESTS PASSING ]</span>
+            <span className="sx-tag">[ SALES CALL COACHING ]</span>
           </div>
 
           <h1 className="sx-display sx-d0">
@@ -303,10 +307,10 @@ export default function LandingPage() {
           </p>
 
           <div className="sx-hero-actions">
-            <Link href="/console" className="sx-btn sx-btn-solid roll-host">
+            <Link href={stranger ? "/signup" : "/console"} className="sx-btn sx-btn-solid roll-host">
               <span className="roll">
-                <span>Open the console</span>
-                <span>Open the console</span>
+                <span>{stranger ? "Get started" : "Open the dashboard"}</span>
+                <span>{stranger ? "Get started" : "Open the dashboard"}</span>
               </span>
               <Arrow />
             </Link>
@@ -323,25 +327,9 @@ export default function LandingPage() {
           </div>
 
           <div className="sx-hero-meta">
-            <span className="sx-tag">
-              [ REASONING · {up(health?.models?.reasoning) || "—"} ]
-            </span>
-            <span className="sx-tag">
-              [ ASR ·{" "}
-              {offline(engine.transcription)
-                ? "OFFLINE TWIN · NO AUDIO TRANSCRIBED"
-                : up(health?.models?.transcription)} ]
-            </span>
-            <span className="sx-tag">
-              [ INDEX ·{" "}
-              {offline(engine.embedding)
-                ? "OFFLINE TWIN · NOT SEMANTIC"
-                : up(health?.models?.embedding)} ]
-            </span>
-            <span className="sx-tag sx-tag-signal">
-              [ CORPUS · {overview?.team.calls_analyzed ?? 10} CALLS ·{" "}
-              {overview?.team.hours_analyzed ?? "—"} HOURS ]
-            </span>
+            <span className="sx-tag">[ ENGLISH · URDU · ROMAN URDU ]</span>
+            <span className="sx-tag">[ EVERY FINDING CITES THE TRANSCRIPT ]</span>
+            <span className="sx-tag sx-tag-signal">[ PRACTISE AGAINST THE BUYER WHO BEAT YOU ]</span>
           </div>
         </div>
 
@@ -424,7 +412,7 @@ export default function LandingPage() {
       {/* ================================================================
           CHAPTER RUNS — the six agents
           ============================================================== */}
-      <section className="sx-section-line" data-status="THE PIPELINE">
+      <section id="pipeline" className="sx-section-line" data-status="THE PIPELINE">
         <div
           style={{
             display: "flex",
@@ -480,7 +468,7 @@ export default function LandingPage() {
       {/* ================================================================
           EVIDENCE — a real analysed call
           ============================================================== */}
-      <section className="sx-section sx-section-line" data-status="EVIDENCE">
+      <section id="evidence" className="sx-section sx-section-line" data-status="EVIDENCE">
         <div className="sx-two-col">
           <div className="sx-sticky">
             <span className="sx-bracket">04 — EVIDENCE</span>
@@ -493,9 +481,9 @@ export default function LandingPage() {
                 letterSpacing: "0.14em",
               }}
             >
-              {demo
-                ? `RENDERED LIVE FROM ${demo.call.title.toUpperCase()}`
-                : "AWAITING THE API"}
+              {ownCall
+                ? `RENDERED LIVE FROM ${ownCall.call.title.toUpperCase()}`
+                : "RENDERED LIVE FROM A SAMPLE CALL"}
             </p>
           </div>
 
@@ -507,10 +495,10 @@ export default function LandingPage() {
               style={{ maxWidth: "14ch" }}
             />
             <p className="sx-lede" style={{ marginTop: 20 }}>
-              The ribbon below is a real conversation from the seeded corpus,
-              drawn by the same component the console uses, from the same
-              measurements. Its thickness is who held the floor; its markers are
-              objections, commitments and the plays that landed.
+              The ribbon below is a sample conversation, scripted for this
+              demo and drawn by the same component the dashboard uses, from the
+              same measurements. Its thickness is who held the floor; its markers
+              are objections, commitments and the plays that landed.
             </p>
 
             <div
@@ -583,7 +571,7 @@ export default function LandingPage() {
       {/* ================================================================
           THE WAY IN
           ============================================================== */}
-      <section className="sx-section sx-section-line" data-status="ENTRY">
+      <section id="entry" className="sx-section sx-section-line" data-status="ENTRY">
         <div
           style={{
             display: "grid",
