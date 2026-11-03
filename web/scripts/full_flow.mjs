@@ -166,7 +166,7 @@ check("the plan is there with nothing clicked", await see(amna, /Test me on this
 
 await amna.goto(`${BASE}/billing`);
 check("one credit was used", await see(amna, /4\s*credits left/i));
-check("the history says where they went", await see(amna, /Bought on PayPal/) && (await see(amna, /Recording analysed/)));
+check("the history says where they went", await see(amna, /Credits bought/) && (await see(amna, /Recording analysed/)));
 
 /* --- The closing test --------------------------------------------------------- */
 

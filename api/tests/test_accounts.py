@@ -156,6 +156,25 @@ async def two_teams(world):
     await b.aclose()
 
 
+class TestClocks:
+    async def _sign_in_with_issued_at(self, world, offset):
+        _, browser, fake = world
+        start_claims = {"iat": int(time.time()) + offset}
+        async with browser() as client:
+            response = await sign_in(client, fake, **start_claims)
+            return response, (await client.get("/api/auth/me")).json()["user"]
+
+    async def test_a_clock_a_few_seconds_behind_google_can_still_sign_in(self, world):
+        response, user = await self._sign_in_with_issued_at(world, 5)
+        assert response.status_code == 302 and "error=" not in response.headers["location"]
+        assert user is not None
+
+    async def test_a_token_from_well_in_the_future_is_still_refused(self, world):
+        response, user = await self._sign_in_with_issued_at(world, 120)
+        assert "error=failed" in response.headers["location"]
+        assert user is None
+
+
 class TestSignIn:
     async def test_start_sends_a_complete_request_to_google(self, world):
         _, browser, _ = world

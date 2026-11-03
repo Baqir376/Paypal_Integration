@@ -1622,6 +1622,9 @@ html[data-surface="auth"], html[data-surface="auth"] body { background: #06080a;
 .pay-pop-cancel { width: 100%; justify-content: center; margin-top: 6px; }
 .pay-pop-sdk { margin-top: 10px; font-size: 11px; color: var(--ink-3); }
 .first-run-step { cursor: pointer; }
+/* Braintree's form is always light, so it cannot inherit a dark theme's pale text. */
+.dropin-box, .dropin-box * { color-scheme: light; }
+.dropin-box { color: #2c2e2f; }
 
 /* A password account that has not confirmed its address */
 .confirm-email {

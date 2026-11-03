@@ -74,7 +74,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
   // upload page, bought on the return page.
   useEffect(() => {
     if (mustSignIn || me === undefined) return;
-    api.billing().then(setBilling).catch(() => setBilling(null));
+    const refresh = () => api.billing().then(setBilling).catch(() => setBilling(null));
+    refresh();
+    window.addEventListener("salix:credits", refresh);
+    return () => window.removeEventListener("salix:credits", refresh);
   }, [pathname, mustSignIn, me]);
 
   useEffect(() => {

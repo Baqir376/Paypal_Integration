@@ -39,7 +39,7 @@ function loadDropIn(): Promise<{ create: (options: object) => Promise<DropIn> }>
 }
 
 const REASONS: Record<string, string> = {
-  purchase: "Bought on PayPal",
+  purchase: "Credits bought",
   call_analysis: "Recording analysed",
   call_refund: "Refunded: analysis failed",
   paypal_refund: "Refunded on PayPal",
@@ -145,7 +145,10 @@ function BillingPage() {
   }, [checkout]);
 
   useEffect(() => {
-    if (added !== null) popToast(`${added} credits added`);
+    if (added === null) return;
+    popToast(`${added} credits added`);
+    // The balance in the rail is the Shell's, and this page did not navigate.
+    window.dispatchEvent(new Event("salix:credits"));
   }, [added]);
 
   async function buy(packId: string) {
@@ -336,7 +339,7 @@ function BillingPage() {
           <div className="eyebrow" style={{ marginBottom: 10 }}>
             Paying for {state.packs.find((p) => p.id === paying)?.label}
           </div>
-          <div ref={dropInBox} />
+          <div ref={dropInBox} className="dropin-box" />
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button className="btn btn-primary" onClick={payBraintree} disabled={buying !== null}>
               {buying ? "Paying…" : "Pay now"}

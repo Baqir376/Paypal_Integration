@@ -128,6 +128,11 @@ async def exchange_code(settings: Settings, code: str, verifier: str) -> str:
     return token
 
 
+#: A token is stamped by Google's clock and checked by this one. With no allowance, a
+#: machine a second behind rejects a token issued that instant as "used too early".
+CLOCK_SKEW_S = 10
+
+
 async def verify_id_token(settings: Settings, token: str, nonce: str) -> GoogleProfile:
     from google.oauth2 import id_token
 
@@ -137,9 +142,11 @@ async def verify_id_token(settings: Settings, token: str, nonce: str) -> GoogleP
             token,
             _google_request(),
             settings.google_client_id,
+            clock_skew_in_seconds=CLOCK_SKEW_S,
         )
     except Exception as exc:  # noqa: BLE001
-        raise GoogleError(f"ID token rejected: {type(exc).__name__}") from exc
+        # The library's own words, which are what tell a clock from a wrong audience.
+        raise GoogleError(f"ID token rejected: {type(exc).__name__}: {str(exc)[:160]}") from exc
 
     if not secrets.compare_digest(str(claims.get("nonce", "")), nonce):
         raise GoogleError("ID token nonce does not match this attempt")

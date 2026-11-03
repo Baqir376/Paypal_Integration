@@ -69,7 +69,7 @@ python -m venv .venv
 **2 — Run the test suite.** Still in `api/`:
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 1426 passed, 10 skipped
+.venv/Scripts/python -m pytest -q     # 1428 passed, 10 skipped
 ```
 
 Everything below assumes `.venv/Scripts/python` on Windows; on macOS and Linux
@@ -527,7 +527,7 @@ api/
     routers/      HTTP surface
   scripts/
     gen_types.py  compiles the Pydantic contract into web/lib/types.ts
-  tests/          1436 tests
+  tests/          1438 tests
 seed/             the corpus: cast, scripts, and the build pipeline
 web/
   app/            index, archive, console, calls, reps, playbook, deals,
@@ -575,7 +575,7 @@ cd web && npx tsc --noEmit
 - **Repair loops.** Structured output that fails validation is returned to the
   model *with the validator's complaint*; citations that name nonexistent
   segments are returned with the list of legal ids.
-- **Typed end to end**, and 1436 tests covering the metrics engine against
+- **Typed end to end**, and 1438 tests covering the metrics engine against
   hand-computed fixtures, Urdu and Roman Urdu question and backchannel
   detection, vector search, persistence round-trips, the full DAG, and every
   HTTP endpoint against a really-seeded database.
