@@ -47,6 +47,7 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
@@ -77,10 +78,15 @@ export function CommandPalette({
       api
         .search(query, { k: 6 })
         .then((results) => {
-          if (id === sequence.current) setHits(results);
+          if (id !== sequence.current) return;
+          setSearchFailed(false);
+          setHits(results);
         })
         .catch(() => {
-          if (id === sequence.current) setHits([]);
+          if (id !== sequence.current) return;
+          // Not the same as finding nothing, and must not look like it.
+          setSearchFailed(true);
+          setHits([]);
         })
         .finally(() => {
           if (id === sequence.current) setSearching(false);
@@ -207,7 +213,9 @@ export function CommandPalette({
                 ? "Keep typing to search the call archive."
                 : searching
                   ? "Searching…"
-                  : "Nothing matched."}
+                  : searchFailed
+                    ? "Search is unavailable right now. Try again in a moment."
+                    : "Nothing matched."}
             </div>
           )}
 

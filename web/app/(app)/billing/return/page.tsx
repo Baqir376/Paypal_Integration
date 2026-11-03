@@ -14,10 +14,10 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { IconArrow, IconCheck, IconWarning } from "@/components/icons";
-import { Burst } from "@/components/Pop";
+import { PaymentSuccess } from "@/components/PaymentSuccess";
 import { LoadingState } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
-import type { OrderResult } from "@/lib/types";
+import type { BillingState, OrderResult } from "@/lib/types";
 
 function ReturnPage() {
   const token = useSearchParams().get("token");
@@ -28,17 +28,35 @@ function ReturnPage() {
   // Strict mode runs effects twice in development. Harmless to the money, but
   // the second answer would briefly replace the first on screen.
   const started = useRef(false);
+  /** A lost connection says nothing about the money, unlike PayPal or the server refusing. */
+  const [unsure, setUnsure] = useState(false);
+  const [celebrating, setCelebrating] = useState(true);
+  const [billing, setBilling] = useState<BillingState | null>(null);
 
   useEffect(() => {
     if (!token || started.current) return;
     started.current = true;
     api
       .captureOrder(token)
-      .then(setResult)
-      .catch((e: ApiError) => setFailure(e.detail));
+      .then((order) => {
+        setResult(order);
+        // The balance in the rail is the Shell's, and it was fetched before this capture.
+        window.dispatchEvent(new Event("salix:credits"));
+        // Only labels the receipt, so failing to load it must not read as a failed payment.
+        api.billing().then(setBilling).catch(() => {});
+      })
+      .catch((e: ApiError) => {
+        setUnsure(!(e.status >= 400 && e.status < 500));
+        setFailure(e.detail);
+      });
   }, [token]);
 
   const paid = result?.status === "completed";
+  const method = billing?.simulated
+    ? "Simulated checkout, no real money"
+    : billing?.environment === "sandbox"
+      ? "PayPal sandbox, test money"
+      : "PayPal";
 
   return (
     <div className="page" data-status="PAYMENT" style={{ maxWidth: 620 }}>
@@ -65,7 +83,17 @@ function ReturnPage() {
 
         {paid && (
           <div className="paid">
-            <Burst />
+            <PaymentSuccess
+              open={celebrating}
+              onClose={() => setCelebrating(false)}
+              credits={result.credits}
+              balance={result.balance}
+              orderId={result.order_id}
+              amount={result.amount}
+              currency={result.currency}
+              method={method}
+              footnote={billing?.simulated ? undefined : "PayPal Server SDK by APIMatic"}
+            />
             <motion.span
               className="paid-tick"
               initial={{ scale: 0, rotate: -40 }}
@@ -111,14 +139,23 @@ function ReturnPage() {
           <>
             <IconWarning size={20} style={{ color: "var(--rose)", marginBottom: 12 }} />
             <h1 className="display d3" style={{ margin: 0 }}>
-              Payment not completed
+              {unsure ? "We could not confirm your payment yet" : "Payment not completed"}
             </h1>
             <p className="lede" style={{ marginTop: 12 }}>
-              {failure}
+              {unsure
+                ? "The connection dropped before we heard back. Checking again is safe, because a payment can only add its credits once."
+                : failure}
             </p>
-            <Link href="/billing" className="btn">
-              Back to credits
-            </Link>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {unsure && (
+                <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
+                  Check again
+                </button>
+              )}
+              <Link href="/billing" className="btn">
+                Back to credits
+              </Link>
+            </div>
           </>
         )}
       </motion.div>

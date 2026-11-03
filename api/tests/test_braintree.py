@@ -105,6 +105,21 @@ class TestPaying:
         assert state["provider"] == "braintree"
         assert state["can_purchase"] is True and state["enforced"] is True and state["simulated"] is False
 
+    async def test_paypal_is_offered_only_when_switched_on(self, world, monkeypatch):
+        from salix.config import get_settings
+
+        client, _ = world
+        settings = get_settings()
+        assert (await client.get("/api/billing")).json()["paypal_wallet"] is False
+        monkeypatch.setattr(settings, "braintree_paypal", True)
+        assert (await client.get("/api/billing")).json()["paypal_wallet"] is True
+
+    async def test_the_receipt_says_what_was_paid(self, world):
+        client, _ = world
+        order = (await pay(client)).json()
+        assert order["status"] == "completed"
+        assert (order["amount"], order["currency"]) == ("10.00", "USD")
+
     async def test_a_client_token_comes_from_the_server(self, world):
         client, _ = world
         assert (await client.post("/api/billing/braintree/client-token")).json()["client_token"] == "client-token-123"

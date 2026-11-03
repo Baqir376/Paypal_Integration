@@ -14,12 +14,12 @@
 
 import Link from "next/link";
 
+import { FooterWord } from "./FooterWord";
+
 export function SiteFooter() {
   return (
     <footer className="sx-foot" data-status="COLOPHON">
-      <p className="sx-foot-word" aria-hidden="true">
-        SALIX
-      </p>
+      <FooterWord />
 
       <div className="sx-foot-grid">
         <div>
@@ -109,11 +109,8 @@ export function SiteFooter() {
           borderTop: "1px solid var(--line)",
         }}
       >
-        <span className="sx-tag">[ BUILT FOR ALIBABA CLOUD MODEL STUDIO ]</span>
-        {/* The repository is all-rights-reserved -- see LICENSE. Advertising
-            MIT on every page of a product whose design is deliberately held
-            back is the one wrong claim here that somebody could act on. */}
-        <span className="sx-tag">[ ALL RIGHTS RESERVED ]</span>
+        <span className="sx-tag">[ PAYMENTS BY PAYPAL · SDK BY APIMATIC ]</span>
+        <span className="sx-tag">[ MIT LICENSE ]</span>
       </div>
     </footer>
   );

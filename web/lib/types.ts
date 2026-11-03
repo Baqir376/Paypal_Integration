@@ -815,6 +815,7 @@ export interface BillingState {
   can_buy: boolean;
   simulated: boolean;
   provider: "paypal" | "braintree" | "simulator" | null;
+  paypal_wallet?: boolean;
   environment: string;
   balance: number;
   call_cost: number;
@@ -828,4 +829,6 @@ export interface OrderResult {
   credits: number;
   balance: number;
   detail: string;
+  amount?: string;
+  currency?: string;
 }

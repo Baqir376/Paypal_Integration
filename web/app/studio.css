@@ -1,0 +1,556 @@
+/* ==========================================================================
+   The studio: how the signed-in app looks and moves.
+
+   Loaded last and scoped to .shell, so the landing page and sign-in keep their
+   own look, and to screen, so a printed cycle report stays plain paper.
+
+   Each tab has its own pair of colours, set once below and picked up by the
+   background, the header, the rail and the charts.
+   ========================================================================= */
+
+.shell {
+  --tab-a: #d4f55a;
+  --tab-b: #7ddcd2;
+  --tab-c: #c7a15c;
+  --tab-line: color-mix(in oklab, var(--tab-a) 62%, var(--ink));
+  --glass: color-mix(in srgb, var(--paper-2) 76%, transparent);
+  --glass-strong: color-mix(in srgb, var(--paper-2) 88%, transparent);
+  --glass-rule: color-mix(in srgb, var(--ink) 11%, transparent);
+}
+.shell[data-tab="calls"]    { --tab-a: #6fd4cb; --tab-b: #8f9bff; --tab-c: #d4f55a; }
+.shell[data-tab="team"]     { --tab-a: #ffb27d; --tab-b: #e58fd0; --tab-c: #d4f55a; }
+.shell[data-tab="reps"]     { --tab-a: #ffb27d; --tab-b: #e58fd0; --tab-c: #d4f55a; }
+.shell[data-tab="playbook"] { --tab-a: #b99bff; --tab-b: #ffc46b; --tab-c: #6fd4cb; }
+.shell[data-tab="deals"]    { --tab-a: #ff8f8f; --tab-b: #ffb35c; --tab-c: #b99bff; }
+.shell[data-tab="dojo"]     { --tab-a: #b6f03c; --tab-b: #a58bff; --tab-c: #6fd4cb; }
+.shell[data-tab="report"]   { --tab-a: #7db4ff; --tab-b: #ffd071; --tab-c: #6fd4cb; }
+.shell[data-tab="upload"]   { --tab-a: #62dcf0; --tab-b: #d4f55a; --tab-c: #8f9bff; }
+.shell[data-tab="billing"]  { --tab-a: #ffc439; --tab-b: #d4f55a; --tab-c: #6fd4cb; }
+
+@media screen {
+  /* --- The background ---------------------------------------------------- */
+  .studio-backdrop {
+    position: fixed; inset: 0; z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tab-a) 10%, transparent), transparent 60%),
+      radial-gradient(90% 80% at 0% 100%, color-mix(in srgb, var(--tab-b) 9%, transparent), transparent 62%),
+      var(--paper);
+    transition: background 700ms ease;
+  }
+  .studio-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.2;
+    transition: background 900ms ease;
+  }
+  .studio-orb-a { width: 54vw; height: 54vw; top: -24vw; right: -6vw; background: var(--tab-a); animation: orb-a 34s ease-in-out infinite alternate; }
+  .studio-orb-b { width: 42vw; height: 42vw; bottom: -20vw; left: 8vw; background: var(--tab-b); animation: orb-b 42s ease-in-out infinite alternate; }
+  .studio-orb-c { width: 26vw; height: 26vw; top: 34%; left: 44%; background: var(--tab-c); opacity: 0.1; animation: orb-c 28s ease-in-out infinite alternate; }
+  @keyframes orb-a { to { transform: translate(-16vw, 12vh) scale(1.16); } }
+  @keyframes orb-b { to { transform: translate(18vw, -14vh) scale(0.9); } }
+  @keyframes orb-c { to { transform: translate(-22vw, 18vh) scale(1.3); } }
+
+  /* Willow-like contour lines, faded out before any edge. */
+  .studio-lines {
+    position: absolute; inset: 0;
+    background-color: var(--ink);
+    opacity: 0.075;
+    -webkit-mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='420' fill='none' stroke='black' stroke-width='1'%3E%3Cpath d='M-20 60C120 10 220 110 380 60S640 10 780 60'/%3E%3Cpath d='M-20 120C120 70 220 170 380 120S640 70 780 120'/%3E%3Cpath d='M-20 180C120 130 220 230 380 180S640 130 780 180'/%3E%3Cpath d='M-20 240C120 190 220 290 380 240S640 190 780 240'/%3E%3Cpath d='M-20 300C120 250 220 350 380 300S640 250 780 300'/%3E%3Cpath d='M-20 360C120 310 220 410 380 360S640 310 780 360'/%3E%3C/svg%3E") 0 0 / 760px 420px,
+      radial-gradient(70% 70% at 74% 20%, #000, transparent 76%);
+    mask:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='420' fill='none' stroke='black' stroke-width='1'%3E%3Cpath d='M-20 60C120 10 220 110 380 60S640 10 780 60'/%3E%3Cpath d='M-20 120C120 70 220 170 380 120S640 70 780 120'/%3E%3Cpath d='M-20 180C120 130 220 230 380 180S640 130 780 180'/%3E%3Cpath d='M-20 240C120 190 220 290 380 240S640 190 780 240'/%3E%3Cpath d='M-20 300C120 250 220 350 380 300S640 250 780 300'/%3E%3Cpath d='M-20 360C120 310 220 410 380 360S640 310 780 360'/%3E%3C/svg%3E") 0 0 / 760px 420px,
+      radial-gradient(70% 70% at 74% 20%, #000, transparent 76%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  :root[data-theme="light"] .studio-orb { opacity: 0.34; }
+  :root[data-theme="light"] .studio-orb-c { opacity: 0.18; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .studio-orb { opacity: 0.34; }
+    :root:not([data-theme="dark"]) .studio-orb-c { opacity: 0.18; }
+  }
+
+  /* A soft light that follows the pointer across the work area. */
+  .app-main::before {
+    content: "";
+    position: fixed; z-index: -1; inset: 0;
+    pointer-events: none;
+    background: radial-gradient(420px circle at var(--mx, -999px) var(--my, -999px), color-mix(in srgb, var(--tab-a) 10%, transparent), transparent 70%);
+  }
+
+  /* --- The rail ---------------------------------------------------------- */
+  .shell .app-rail {
+    z-index: 3;
+    background: color-mix(in srgb, var(--paper-2) 62%, transparent);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border-right-color: var(--glass-rule);
+  }
+  .shell .rail-marker {
+    background: linear-gradient(95deg, color-mix(in srgb, var(--tab-a) 24%, transparent), color-mix(in srgb, var(--tab-b) 8%, transparent));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-a) 24%, transparent);
+  }
+  .shell .rail-marker::before {
+    content: "";
+    position: absolute; left: 0; top: 22%; bottom: 22%;
+    width: 3px; border-radius: 3px;
+    background: var(--tab-line);
+    box-shadow: 0 0 12px var(--tab-a);
+  }
+  .shell .rail-link-icon { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), color 160ms ease; }
+  .shell .rail-link:hover .rail-link-icon { transform: scale(1.22) rotate(-6deg); color: var(--tab-line); }
+  .shell .rail-link[data-active="true"] .rail-link-icon { color: var(--tab-line); }
+
+  /* --- Page headers ------------------------------------------------------ */
+  .shell .page-head {
+    align-items: center;
+    overflow: clip;
+    margin-bottom: 22px;
+    padding: 24px 26px;
+    border: 0;
+    border-radius: 24px;
+    background:
+      linear-gradient(115deg, color-mix(in srgb, var(--tab-a) 15%, transparent), color-mix(in srgb, var(--tab-b) 7%, transparent) 58%, transparent 92%),
+      var(--glass);
+    box-shadow: inset 0 0 0 1px var(--glass-rule), 0 26px 60px -46px rgb(0 0 0 / 0.6);
+  }
+  .shell .page-head > * { position: relative; z-index: 1; }
+  .shell .page-head > .studio-art, .shell .page-head::after { pointer-events: none; }
+  /* Only the tabs with art get this: a mask of "none" would paint a solid block. */
+  :is(
+    .page[data-status="COMMAND CENTRE"], .page[data-status="CALLS"], .page[data-status="TEAM"],
+    .page[data-status="PLAYBOOK"], .page[data-status="DEALS AT RISK"], .page[data-status="THE DOJO"],
+    .page[data-status="CYCLE REPORT"], .page[data-status="ANALYSE A CALL"]
+  ) > .page-head::after {
+    content: "";
+    position: absolute; z-index: 0; top: 8px; bottom: 8px; right: 18px;
+    width: min(320px, 34%);
+    background: linear-gradient(100deg, var(--tab-a), var(--tab-b), var(--tab-c), var(--tab-a)) 0 0 / 300% 100%;
+    opacity: 0.5;
+    -webkit-mask: var(--art, none) right center / contain no-repeat;
+    mask: var(--art, none) right center / contain no-repeat;
+    animation: art-flow 11s linear infinite;
+  }
+  /* Where a header has buttons on its right, the art moves clear of them. */
+  .shell .page > .page-head:has(> * + *)::after { right: 232px; width: min(280px, 26%); }
+  @keyframes art-flow { to { background-position: -300% 0; } }
+
+  .page[data-status="COMMAND CENTRE"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='none' stroke='black' stroke-linecap='round'%3E%3Cpath stroke-width='2' d='M90 112a60 60 0 0 1 120 0'/%3E%3Cpath stroke-width='1.5' stroke-dasharray='2 7' d='M66 112a84 84 0 0 1 168 0'/%3E%3Cpath stroke-width='1' d='M42 112a108 108 0 0 1 216 0'/%3E%3Cpath stroke-width='3' d='M150 112l34-40'/%3E%3Ccircle cx='150' cy='112' r='5' fill='black'/%3E%3Ccircle cx='205' cy='38' r='4' fill='black'/%3E%3Ccircle cx='98' cy='44' r='3' fill='black'/%3E%3C/svg%3E"); }
+  .page[data-status="CALLS"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='none' stroke='black' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M12 52v16M30 40v40M48 54v12M66 24v72M84 44v32M102 12v96M120 34v52M138 48v24M156 18v84M174 38v44M192 52v16M210 28v64M228 42v36M246 16v88M264 46v28M282 54v12'/%3E%3C/svg%3E"); }
+  .page[data-status="TEAM"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='none' stroke='black' stroke-width='1.5'%3E%3Cpath d='M60 74L128 30L196 62L262 26M128 30L140 98L196 62M60 74L140 98L232 100L196 62M262 26L232 100'/%3E%3Cg fill='black' stroke='none'%3E%3Ccircle cx='60' cy='74' r='9'/%3E%3Ccircle cx='128' cy='30' r='13'/%3E%3Ccircle cx='196' cy='62' r='10'/%3E%3Ccircle cx='262' cy='26' r='8'/%3E%3Ccircle cx='140' cy='98' r='7'/%3E%3Ccircle cx='232' cy='100' r='6'/%3E%3C/g%3E%3C/svg%3E"); }
+  .page[data-status="PLAYBOOK"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Crect x='186' y='16' width='72' height='92' rx='8' transform='rotate(14 222 62)'/%3E%3Crect x='156' y='14' width='72' height='92' rx='8' transform='rotate(4 192 60)'/%3E%3Crect x='124' y='14' width='72' height='92' rx='8' transform='rotate(-7 160 60)'/%3E%3Cpath d='M138 40l44-5M140 54l44-5M142 68l28-3'/%3E%3C/svg%3E"); }
+  .page[data-status="DEALS AT RISK"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath stroke-width='3' d='M24 22L74 36L108 28L154 62L196 54L238 92L280 104'/%3E%3Cpath stroke-width='1' stroke-dasharray='3 7' d='M24 22H280'/%3E%3Cg fill='black' stroke='none'%3E%3Ccircle cx='74' cy='36' r='5'/%3E%3Ccircle cx='154' cy='62' r='5'/%3E%3Ccircle cx='238' cy='92' r='6'/%3E%3C/g%3E%3Cpath stroke-width='3' d='M280 88v16h-16'/%3E%3C/svg%3E"); }
+  .page[data-status="THE DOJO"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='none' stroke='black'%3E%3Ccircle cx='200' cy='60' r='54' stroke-width='1.2'/%3E%3Ccircle cx='200' cy='60' r='38' stroke-width='2' stroke-dasharray='4 6'/%3E%3Ccircle cx='200' cy='60' r='22' stroke-width='3'/%3E%3Ccircle cx='200' cy='60' r='7' fill='black'/%3E%3Cpath stroke-width='3' stroke-linecap='round' d='M92 16l100 40M92 16l-8 16M92 16l18-2'/%3E%3C/svg%3E"); }
+  .page[data-status="CYCLE REPORT"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='black'%3E%3Crect x='54' y='84' width='24' height='28' rx='5'/%3E%3Crect x='92' y='66' width='24' height='46' rx='5'/%3E%3Crect x='130' y='72' width='24' height='40' rx='5'/%3E%3Crect x='168' y='44' width='24' height='68' rx='5'/%3E%3Crect x='206' y='28' width='24' height='84' rx='5'/%3E%3Crect x='244' y='10' width='24' height='102' rx='5'/%3E%3C/svg%3E"); }
+  .page[data-status="ANALYSE A CALL"] { --art: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 120' fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='200' cy='60' r='54' stroke-width='1' stroke-dasharray='2 8'/%3E%3Ccircle cx='200' cy='60' r='36' stroke-width='2'/%3E%3Cpath stroke-width='4' d='M200 80V42M184 56l16-16 16 16'/%3E%3Cpath stroke-width='4' d='M40 60v0M60 46v28M80 36v48M100 50v20M120 40v40'/%3E%3C/svg%3E"); }
+
+  .shell .page-head h1 {
+    padding-bottom: 0.08em;
+    background: linear-gradient(95deg, var(--ink) 30%, color-mix(in oklab, var(--tab-a) 55%, var(--ink)) 50%, var(--ink) 70%) 0 0 / 260% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: title-sheen 9s ease-in-out infinite;
+  }
+  @keyframes title-sheen { 0%, 55% { background-position: 110% 0; } 100% { background-position: -60% 0; } }
+  .shell .page-head .eyebrow::before {
+    content: "";
+    display: inline-block;
+    width: 6px; height: 6px;
+    margin-right: 8px;
+    border-radius: 50%;
+    vertical-align: 1px;
+    background: var(--tab-line);
+    box-shadow: 0 0 0 0 var(--tab-a);
+    animation: eyebrow-beat 2.6s ease-out infinite;
+  }
+  @keyframes eyebrow-beat { 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
+
+  /* --- Panels ------------------------------------------------------------ */
+  .shell .panel, .shell .panel-flush {
+    background: var(--glass);
+    border-color: var(--glass-rule);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent), 0 22px 50px -42px rgb(0 0 0 / 0.65);
+    transition: border-color 220ms ease, box-shadow 280ms ease, translate 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .shell .panel:hover, .shell .panel-flush:hover {
+    border-color: color-mix(in srgb, var(--tab-a) 42%, var(--glass-rule));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent), 0 26px 56px -36px color-mix(in srgb, var(--tab-a) 34%, rgb(0 0 0 / 0.6));
+  }
+  /* Small cards can lift. A long table lifting under the pointer would feel seasick. */
+  .shell .panel:not(.panel-flush):not(.pack):not(label):hover { translate: 0 -2px; }
+
+  .shell .page > * { animation: studio-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+  .shell .page > *:nth-child(2) { animation-delay: 70ms; }
+  .shell .page > *:nth-child(3) { animation-delay: 130ms; }
+  .shell .page > *:nth-child(4) { animation-delay: 190ms; }
+  .shell .page > *:nth-child(n + 5) { animation-delay: 240ms; }
+  @keyframes studio-rise { from { opacity: 0; transform: translateY(18px); } }
+
+  .shell .table tbody tr { transition: background 140ms ease, box-shadow 140ms ease; }
+  .shell .table tbody tr:hover {
+    background: color-mix(in srgb, var(--tab-a) 8%, transparent);
+    box-shadow: inset 3px 0 0 var(--tab-line);
+  }
+  .shell .team-row { transition: background 140ms ease; }
+  .shell .team-row:hover { background: color-mix(in srgb, var(--tab-a) 7%, transparent); }
+
+  /* --- Buttons and fields ------------------------------------------------- */
+  .shell .btn-primary { position: relative; overflow: hidden; }
+  .shell .btn-primary::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.5) 50%, transparent 65%);
+    transform: translateX(-120%);
+    pointer-events: none;
+  }
+  .shell .btn-primary:hover:not(:disabled)::after { transform: translateX(120%); transition: transform 680ms ease; }
+  .shell .btn { transition: translate 200ms cubic-bezier(0.34, 1.56, 0.64, 1), background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 200ms ease; }
+  .shell .btn:hover:not(:disabled) { translate: 0 -1px; }
+  .shell .btn:active:not(:disabled) { translate: 0 1px; }
+  .shell .field { background: color-mix(in srgb, var(--paper-2) 62%, transparent); transition: border-color 150ms ease, box-shadow 180ms ease; }
+  .shell .field:focus { border-color: var(--tab-line); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tab-a) 20%, transparent); }
+
+  .shell .quick-button { animation: quick-ring 3.4s ease-out infinite; }
+  @keyframes quick-ring {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, #d4f55a 55%, transparent), 0 14px 30px -12px rgb(0 0 0 / 0.6); }
+    55%, 100% { box-shadow: 0 0 0 18px transparent, 0 14px 30px -12px rgb(0 0 0 / 0.6); }
+  }
+
+  /* --- The drop zone ------------------------------------------------------ */
+  .dropzone { position: relative; overflow: hidden; }
+  .dropzone > svg { animation: drop-bob 2.6s ease-in-out infinite; color: var(--tab-line) !important; }
+  @keyframes drop-bob { 50% { transform: translateY(-7px); } }
+  .dropzone::before {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background: radial-gradient(60% 90% at 50% 0%, color-mix(in srgb, var(--tab-a) 16%, transparent), transparent 72%);
+  }
+
+  /* --- Two columns: the work, and what is true about it ------------------- */
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 322px; gap: 20px; align-items: start; }
+  .split[data-single] { grid-template-columns: minmax(0, 1fr); }
+  .split-side { display: grid; gap: 14px; position: sticky; top: 22px; }
+  @media (max-width: 1180px) {
+    .split { grid-template-columns: minmax(0, 1fr); }
+    .split-side { position: static; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  }
+
+  .side-card {
+    position: relative;
+    padding: 17px 18px 18px;
+    border-radius: 20px;
+    background: var(--glass);
+    box-shadow: inset 0 0 0 1px var(--glass-rule), 0 22px 50px -42px rgb(0 0 0 / 0.65);
+    overflow: hidden;
+  }
+  .side-card::before {
+    content: "";
+    position: absolute; top: -60px; right: -40px;
+    width: 150px; height: 150px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: var(--tab-a);
+    opacity: 0.14;
+    filter: blur(38px);
+  }
+  .side-card > * { position: relative; }
+  .side-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+  .side-card-head h2 { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 400; line-height: 1.15; color: var(--ink); }
+  .side-card-head span { font-size: 11.5px; color: var(--ink-3); }
+  .side-empty { margin: 0; font-size: 13px; color: var(--ink-3); }
+
+  .journey { --journey-cycle: 1.3s; display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+  .journey li { position: relative; display: flex; gap: 11px; padding-bottom: 13px; font-size: 13px; }
+  .journey li:last-child { padding-bottom: 0; }
+  .journey li:not(:last-child)::before {
+    content: "";
+    position: absolute; left: 11.5px; top: 25px; bottom: 1px;
+    width: 1px;
+    background: var(--glass-rule);
+  }
+  .journey-dot {
+    flex: none;
+    display: grid; place-items: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    font-size: 11px;
+    color: var(--ink-2);
+    box-shadow: inset 0 0 0 1px var(--glass-rule);
+    animation: journey-step calc(var(--journey-cycle) * var(--journey-steps)) linear infinite;
+    animation-delay: calc(var(--journey-cycle) * var(--journey-index));
+  }
+  @keyframes journey-step {
+    0%, 22% { color: #15190a; background: var(--tab-a); box-shadow: 0 0 16px color-mix(in srgb, var(--tab-a) 70%, transparent); }
+    34%, 100% { color: var(--ink-2); background: transparent; box-shadow: inset 0 0 0 1px var(--glass-rule); }
+  }
+  .journey strong { display: block; font-weight: 520; line-height: 24px; color: var(--ink); }
+  .journey small { display: block; margin-top: -2px; font-size: 12px; line-height: 1.4; color: var(--ink-3); }
+
+  .side-checks { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 13px; line-height: 1.4; color: var(--ink-2); }
+  .side-checks li { display: flex; gap: 9px; }
+  .side-checks span { flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; color: var(--tab-line); background: color-mix(in srgb, var(--tab-a) 18%, transparent); }
+
+  .bar-list { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+  .bar-list-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; color: var(--ink-2); }
+  .bar-list-row a:hover { color: var(--ink); text-decoration: underline; }
+  .bar-list-row b { font-weight: 500; color: var(--ink); }
+  .bar-list-track { height: 7px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 8%, transparent); overflow: hidden; }
+  .bar-list-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--tab-a), var(--tab-b)); }
+  .bar-list-track i[data-top] { box-shadow: 0 0 12px var(--tab-a); }
+
+  .fact-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 0; }
+  .fact-row > div { padding: 9px 4px; border-radius: 12px; text-align: center; background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .fact-row dd { margin: 0; font-size: 17px; font-weight: 500; color: var(--ink); }
+  .fact-row dt { font-size: 11px; color: var(--ink-3); }
+
+  .trend { display: block; width: 100%; height: auto; overflow: visible; }
+  .trend-now { animation: trend-beat 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes trend-beat { 50% { transform: scale(1.45); } }
+
+  /* --- Pop-out messages ---------------------------------------------------- */
+  .shell .toast {
+    position: relative;
+    overflow: hidden;
+    max-width: calc(100vw - 32px);
+    white-space: normal;
+    pointer-events: auto;
+    color: var(--ink);
+    background: var(--glass-strong);
+    backdrop-filter: blur(22px) saturate(170%);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+    box-shadow: inset 0 0 0 1px var(--glass-rule), 0 24px 54px -18px rgb(0 0 0 / 0.65);
+  }
+  .shell .toast::after {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 2px;
+    transform-origin: left;
+    background: linear-gradient(90deg, var(--tab-a), var(--tab-b));
+    animation: toast-life var(--toast-life, 4.2s) linear both;
+  }
+  @keyframes toast-life { to { transform: scaleX(0); } }
+  .toast-action {
+    flex: none;
+    margin-left: 6px;
+    padding: 3px 11px;
+    border-radius: 99px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #15190a;
+    background: #d4f55a;
+    transition: scale 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .toast-action:hover { scale: 1.06; }
+
+  @media (hover: none) { .app-main::before { display: none; } }
+  @media (max-width: 880px) {
+    .shell .page-head { padding: 20px 18px; }
+    .shell .page > .page-head::after, .shell .page > .page-head:has(> * + *)::after { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .studio-orb, .shell .page-head::after, .shell .page-head h1, .shell .page-head .eyebrow::before,
+    .shell .page > *, .shell .quick-button, .dropzone > svg, .journey-dot, .trend-now, .shell .toast::after { animation: none; }
+    .shell .page-head h1 { background: none; color: var(--ink); }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .shell { --glass: var(--paper-2); --glass-strong: var(--paper-2); }
+    .shell .app-rail, .shell .toast { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--paper-2); }
+    .studio-orb, .studio-lines { display: none; }
+  }
+}
+
+@media screen {
+  /* Sized to its words, so a narrow screen wraps a sentence instead of stacking it word by word. */
+  .shell .toasts { width: max-content; max-width: calc(100vw - 32px); }
+}
+@media screen and (max-width: 640px) {
+  /* Above the quick actions button, which sits in that corner. */
+  .shell .toasts { bottom: 94px; }
+}
+
+/* --- The payment pill opens a window, so the whole pill is the button --------- */
+@media screen {
+  .pay-status-button {
+    border: 0;
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--paper-2) 62%, transparent);
+    transition: translate 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 180ms ease;
+  }
+  .pay-status-button:hover { translate: 0 -1px; box-shadow: inset 0 0 0 1px var(--tab-line), 0 12px 26px -16px var(--tab-a); }
+  .pay-status-button:hover .info-dot { transform: scale(1.14); }
+  .pay-status-button:focus-visible { outline: 2px solid var(--tab-line); outline-offset: 2px; }
+  .note-body p { margin: 0 0 14px; }
+  .note-body strong { font-weight: 580; color: var(--ink); }
+}
+
+/* --- The closing wordmark: the hero's serif, cream and bark gold ---------------- */
+.foot-word {
+  display: flex;
+  margin: 0 0 40px;
+  font-family: var(--font-display);
+  font-size: clamp(3.6rem, 17vw, 17rem);
+  line-height: 0.95;
+  user-select: none;
+}
+.foot-word-letter {
+  display: inline-block;
+  margin-right: -0.035em;
+  padding: 0 0.035em 0.06em;
+  color: transparent;
+  background: linear-gradient(180deg, var(--text-primary) 25%, var(--accent-gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@media print {
+  .foot-word { display: none; }
+}
+
+@media screen {
+  .note-card .eyebrow { color: var(--ink-2); }
+}
+
+/* --- While Salix works --------------------------------------------------------- */
+@media screen {
+  .working {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    padding: 24px 18px 18px;
+    border-radius: 18px;
+    text-align: center;
+    background: color-mix(in srgb, var(--tab-a) 7%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tab-a) 22%, transparent);
+  }
+  /* A light passing across, slowly, so even a still moment is visibly alive. */
+  .working::before {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--tab-a) 14%, transparent) 50%, transparent 62%);
+    transform: translateX(-100%);
+    animation: working-pass 3.4s ease-in-out infinite;
+  }
+  @keyframes working-pass { to { transform: translateX(100%); } }
+  .working > * { position: relative; }
+  .working-mark { position: relative; display: grid; place-items: center; width: 62px; height: 62px; color: var(--tab-line); }
+  .working-ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--tab-line);
+    border-right-color: color-mix(in srgb, var(--tab-line) 30%, transparent);
+    animation: working-turn 1.5s linear infinite;
+  }
+  .working-ring-b {
+    inset: 8px;
+    border-width: 1px;
+    border-top-color: transparent;
+    border-bottom-color: var(--tab-line);
+    animation-duration: 2.4s;
+    animation-direction: reverse;
+  }
+  @keyframes working-turn { to { rotate: 360deg; } }
+  .working-title { font-family: var(--font-display); font-size: 23px; line-height: 1.2; color: var(--ink); }
+  .working-voice { display: flex; align-items: center; justify-content: center; gap: 3px; width: min(250px, 100%); height: 34px; }
+  .working-voice i {
+    flex: 1;
+    border-radius: 99px;
+    background: var(--tab-line);
+    opacity: 0.7;
+    animation: working-voice 1.25s ease-in-out infinite alternate;
+  }
+  @keyframes working-voice { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+  .working-now { min-height: 22px; font-size: 14px; color: var(--ink-2); }
+  .working-steps { display: flex; gap: 6px; margin: 2px 0 0; padding: 0; list-style: none; }
+  .working-steps li { width: 20px; height: 3px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 14%, transparent); transition: background 300ms ease, width 300ms ease; }
+  .working-steps li[data-state="past"] { background: color-mix(in srgb, var(--tab-line) 45%, transparent); }
+  .working-steps li[data-state="now"] { width: 32px; background: var(--tab-line); }
+  .working-foot { font-size: 11.5px; color: var(--ink-3); }
+
+  .pipe { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
+  .pipe-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 9px; }
+  .pipe-now { min-width: 0; }
+  .pipe-now strong { display: block; font-family: var(--font-display); font-size: 25px; font-weight: 400; line-height: 1.15; color: var(--ink); }
+  .pipe-now small { font-size: 12px; color: var(--ink-3); }
+  .pipe-count { flex: none; font-size: 12.5px; color: var(--ink-2); }
+  .pipe-track { height: 8px; border-radius: 99px; overflow: hidden; background: color-mix(in srgb, var(--ink) 9%, transparent); }
+  .pipe-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--tab-a), var(--tab-b)); box-shadow: 0 0 14px var(--tab-a); }
+  .pipe .working-voice { width: 100%; height: 26px; margin-top: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .working::before, .working-ring, .working-voice i { animation: none; }
+    .working-voice i { transform: scaleY(0.6); }
+  }
+}
+@media screen {
+  .pipe .working-voice { width: min(320px, 100%); margin-inline: auto; }
+}
+
+/* --- Paper ------------------------------------------------------------------------
+   Printing ignores the theme on screen. Without this, a dark-mode report keeps its
+   pale text and prints it on white. Same weight as the theme's own selectors and
+   later in the cascade, so it wins for both the system preference and the toggle. */
+@media print {
+  :root:not([data-print]) {
+    color-scheme: light;
+    --ink: #16161a; --ink-2: #3d3d45; --ink-3: #5c5c66; --ink-4: #80808a;
+    --paper: #fff; --paper-2: #fff; --paper-3: #f2f1ec;
+    --rule: #dcdbd4; --rule-strong: #c6c5bc;
+    --willow: #5f7209; --willow-ink: #4f5d08; --willow-wash: #eef3d4;
+    --sage: #3f6a4b; --sage-wash: #e4ede6;
+    --ember: #955717; --ember-wash: #f6e9d9;
+    --rose: #8f4354; --rose-wash: #f3e2e5;
+    --slate: #4a6076; --slate-wash: #e3e9ef;
+    --rep: #2f6f6b; --rep-soft: #d6e8e6;
+    --buyer: #8a5a86; --buyer-soft: #eddfec;
+  }
+  @page { margin: 16mm 14mm; }
+  html, body { background: #fff !important; }
+  .quick, .toasts, .studio-backdrop, dialog { display: none !important; }
+  .shell { display: block; }
+  .app-main { display: block; }
+  /* Screen-only transforms and entrances must not leave anything half drawn on paper. */
+  .page, .page * { animation: none !important; }
+  .page-head { display: block; margin-bottom: 14pt; padding-bottom: 10pt; border-bottom: 1px solid #c6c5bc; }
+  .panel, .panel-flush { background: #fff !important; box-shadow: none !important; }
+  .table thead { display: table-header-group; }
+  .table tr { break-inside: avoid; }
+  /* A tall table may cross a page: forcing it whole would leave a blank page before it. */
+  .panel-flush:has(.table) { break-inside: auto; }
+  h1, h2, h3, .eyebrow { break-after: avoid; }
+}
+
+/* Six numbers always fill their rows, so no empty grey cell is left over. */
+.report-numbers { grid-template-columns: repeat(6, 1fr); }
+@media (max-width: 1100px), print { .report-numbers { grid-template-columns: repeat(3, 1fr); } }
+@media screen and (max-width: 520px) { .report-numbers { grid-template-columns: repeat(2, 1fr); } }
+
+/* --- Messages long enough to wrap, and the receipt's copy button ------------------- */
+@media screen {
+  .shell .toast { border-radius: 20px; }
+  button.toast-action { border: 0; font-family: inherit; cursor: pointer; }
+  .receipt-copy {
+    display: inline-flex; align-items: baseline; gap: 8px;
+    padding: 0; border: 0;
+    font: inherit; color: inherit; text-align: right;
+    background: none;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+  .receipt-copy small { flex: none; font-family: var(--font-sans); font-size: 11.5px; color: var(--ink-3); transition: color 160ms ease; }
+  .receipt-copy:hover small { color: var(--ink); }
+  .receipt-copy[data-state="copied"] small { color: var(--sage); font-weight: 600; }
+  .receipt-copy[data-state="failed"] small { color: var(--rose); }
+  .receipt-copy:focus-visible { outline: 2px solid var(--willow); outline-offset: 2px; border-radius: 4px; }
+}

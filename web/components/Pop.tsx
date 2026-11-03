@@ -5,7 +5,7 @@
  * burst of celebration, and the quick actions button.
  */
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, animate, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
@@ -85,25 +85,206 @@ export function InfoTip({
   );
 }
 
-/** What used to be a paragraph under a page's title. */
+/**
+ * A button that asks once more before doing something with no undo. It backs out on
+ * its own, so a stray first click cannot leave a loaded button behind.
+ */
+export function ConfirmButton({
+  label,
+  confirmLabel,
+  onConfirm,
+}: {
+  label: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  useEffect(() => {
+    if (!asking) return;
+    const timer = setTimeout(() => setAsking(false), 6000);
+    return () => clearTimeout(timer);
+  }, [asking]);
+
+  if (!asking) {
+    return (
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAsking(true)}>
+        {label}
+      </button>
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        className="btn btn-sm"
+        style={{ color: "var(--rose)", borderColor: "var(--rose)" }}
+        onClick={() => {
+          setAsking(false);
+          onConfirm();
+        }}
+      >
+        {confirmLabel}
+      </button>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAsking(false)}>
+        Keep
+      </button>
+    </>
+  );
+}
+
+/** Counts up to a number. Holds still, on the final value, for anyone who asks for less motion. */
+export function useCountUp(
+  target: number,
+  { from = 0, delay = 0, duration = 1.1 }: { from?: number; delay?: number; duration?: number } = {},
+) {
+  const reduced = useReducedMotion();
+  const [shown, setShown] = useState(reduced ? target : from);
+  useEffect(() => {
+    if (reduced) {
+      setShown(target);
+      return;
+    }
+    const run = animate(from, target, {
+      delay,
+      duration,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (value) => setShown(Math.round(value)),
+    });
+    return () => run.stop();
+  }, [target, from, delay, duration, reduced]);
+  return shown;
+}
+
+/**
+ * A window over the whole page, in frosted glass. Built on <dialog>, so the browser
+ * supplies the focus trap, Escape, and a layer nothing on the page can sit above.
+ */
+export function GlassDialog({
+  open,
+  onClose,
+  label,
+  className,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const card = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || dialog.current?.open) return;
+    dialog.current?.showModal();
+    // Start on the window itself, so no button looks already chosen; Tab goes on from here.
+    card.current?.focus();
+  }, [open]);
+
+  return (
+    <dialog
+      ref={dialog}
+      className="glass-dialog"
+      aria-label={label}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === dialog.current) onClose();
+      }}
+    >
+      <AnimatePresence onExitComplete={() => dialog.current?.close()}>
+        {open && (
+          <motion.div
+            ref={card}
+            tabIndex={-1}
+            className={`glass-card ${className ?? ""}`}
+            initial={{ opacity: 0, scale: 0.82, y: 34 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: 12, transition: { duration: 0.16 } }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+          >
+            <div className="glass-glow" aria-hidden="true" />
+            {children}
+            <button type="button" className="glass-close" aria-label="Close" onClick={onClose}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                <path d="M2.5 2.5l9 9M11.5 2.5l-9 9" />
+              </svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </dialog>
+  );
+}
+
+/** Something to click, and the glass window of explanation it opens. */
+export function NoteWindow({
+  title,
+  eyebrow = "Good to know",
+  trigger,
+  triggerProps,
+  children,
+}: {
+  title: string;
+  eyebrow?: string;
+  trigger: React.ReactNode;
+  triggerProps?: React.ButtonHTMLAttributes<HTMLButtonElement> & { "data-simulated"?: boolean };
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" aria-haspopup="dialog" {...triggerProps} onClick={() => setOpen(true)}>
+        {trigger}
+      </button>
+      <GlassDialog open={open} onClose={() => setOpen(false)} label={title} className="note-card">
+        <div className="eyebrow">{eyebrow}</div>
+        <h2 className="note-title">{title}</h2>
+        <div className="note-body">{children}</div>
+        <button type="button" className="btn btn-primary note-done" onClick={() => setOpen(false)}>
+          Got it
+        </button>
+      </GlassDialog>
+    </>
+  );
+}
+
+/** What used to be a paragraph under a page's title: now its own window, opened on request. */
 export function PageNote({ children }: { children: React.ReactNode }) {
   return (
     <div className="page-note">
-      <InfoTip text="How this works">{children}</InfoTip>
+      <NoteWindow
+        title="How this works"
+        triggerProps={{ className: "note-button" }}
+        trigger={
+          <>
+            <span className="info-dot" aria-hidden="true">
+              i
+            </span>
+            How this works
+          </>
+        }
+      >
+        {children}
+      </NoteWindow>
     </div>
   );
 }
 
 /* ---------------------------------------------------------------------- */
 
-type Toast = { id: number; text: string; tone: "good" | "bad" };
+type ToastAction = { label: string; href?: string; onClick?: () => void };
+type Toast = { id: number; text: string; tone: "good" | "bad"; action?: ToastAction };
 
 let listener: ((toast: Toast) => void) | null = null;
 let counter = 0;
 
 /** From anywhere. Silently does nothing on a page without a Toaster. */
-export function popToast(text: string, tone: Toast["tone"] = "good") {
-  listener?.({ id: ++counter, text, tone });
+export function popToast(text: string, tone: Toast["tone"] = "good", action?: ToastAction) {
+  listener?.({ id: ++counter, text, tone, action });
 }
 
 export function Toaster() {
@@ -112,7 +293,8 @@ export function Toaster() {
   useEffect(() => {
     listener = (toast) => {
       setToasts((all) => [...all.slice(-2), toast]);
-      setTimeout(() => setToasts((all) => all.filter((t) => t.id !== toast.id)), 4200);
+      // One with a button stays longer, so there is time to reach it.
+      setTimeout(() => setToasts((all) => all.filter((t) => t.id !== toast.id)), toast.action ? 8000 : 4200);
     };
     return () => {
       listener = null;
@@ -128,6 +310,7 @@ export function Toaster() {
             layout
             className="toast"
             data-tone={toast.tone}
+            style={{ "--toast-life": toast.action ? "8s" : "4.2s" } as React.CSSProperties}
             initial={{ opacity: 0, y: 26, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.16 } }}
@@ -137,6 +320,23 @@ export function Toaster() {
               {toast.tone === "good" ? <IconCheck size={13} /> : <IconWarning size={13} />}
             </span>
             {toast.text}
+            {toast.action?.href && (
+              <Link href={toast.action.href} className="toast-action">
+                {toast.action.label}
+              </Link>
+            )}
+            {toast.action?.onClick && (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={() => {
+                  toast.action?.onClick?.();
+                  setToasts((all) => all.filter((t) => t.id !== toast.id));
+                }}
+              >
+                {toast.action.label}
+              </button>
+            )}
           </motion.div>
         ))}
       </AnimatePresence>

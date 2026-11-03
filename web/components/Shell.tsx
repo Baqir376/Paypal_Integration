@@ -11,6 +11,7 @@ import type { BillingState, Health, Me } from "@/lib/types";
 
 import { PageTransition } from "./Motion";
 import { QuickActions, Toaster, popToast } from "./Pop";
+import { StudioBackdrop } from "./Studio";
 
 import { CommandPalette } from "./CommandPalette";
 import { Mark } from "./Mark";
@@ -80,6 +81,33 @@ export function Shell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("salix:credits", refresh);
   }, [pathname, mustSignIn, me]);
 
+  // Worth interrupting for: anything done while offline is about to fail.
+  useEffect(() => {
+    const offline = () => popToast("You are offline. Nothing will save until you reconnect.", "bad");
+    const online = () => popToast("You are back online");
+    window.addEventListener("offline", offline);
+    window.addEventListener("online", online);
+    return () => {
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", online);
+    };
+  }, []);
+
+  // Said once a session, and not on the pages where buying is already on screen.
+  useEffect(() => {
+    if (!billing?.enforced || !billing.can_purchase || pathname.startsWith("/billing")) return;
+    if (billing.balance > 2 * billing.call_cost) return;
+    try {
+      if (sessionStorage.getItem("salix-credits-warned")) return;
+      sessionStorage.setItem("salix-credits-warned", "1");
+    } catch {
+      return;
+    }
+    const buy = { href: "/billing", label: "Buy credits" };
+    if (billing.balance < billing.call_cost) popToast("You are out of credits", "bad", buy);
+    else popToast(`Only ${billing.balance} ${billing.balance === 1 ? "credit" : "credits"} left`, "good", buy);
+  }, [billing, pathname]);
+
   useEffect(() => {
     let alive = true;
     const poll = () =>
@@ -117,7 +145,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="shell">
+    <div className="shell" data-tab={pathname.split("/")[1] || "console"}>
+      <StudioBackdrop />
       {/* Layout lives in globals.css rather than inline, because an inline
           style cannot be overridden by a media query -- and stacked above the
           content on a phone, this rail needs to become a bar. */}
@@ -181,7 +210,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <IconCoin size={15} className="rail-link-icon" />
               <span className="rail-link-label">Credits</span>
               <span
-                className="num"
+                key={billing.balance}
+                className="num rail-credits"
                 style={{
                   position: "relative",
                   marginLeft: "auto",
@@ -227,6 +257,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
         style={{ minWidth: 0 }}
         className="app-main"
         onPointerMove={(event) => {
+          event.currentTarget.style.setProperty("--mx", `${event.clientX}px`);
+          event.currentTarget.style.setProperty("--my", `${event.clientY}px`);
           // A soft light under the pointer, on whichever card it is over.
           const card = (event.target as Element).closest<HTMLElement>(".panel, .panel-flush");
           if (!card) return;
@@ -340,9 +372,12 @@ function Account({ me }: { me: Me }) {
     setLeaving(true);
     try {
       await api.logout();
-    } finally {
       // A full navigation, so nothing of this person's stays in memory.
       window.location.assign("/login");
+    } catch {
+      // Still signed in. Going to the login page would only bounce them straight back.
+      setLeaving(false);
+      popToast("You are still signed in. Check your connection and try again.", "bad");
     }
   }
 

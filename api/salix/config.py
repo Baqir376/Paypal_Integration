@@ -162,6 +162,9 @@ class Settings(BaseSettings):
     braintree_merchant_id: Optional[str] = None
     braintree_public_key: Optional[str] = None
     braintree_private_key: Optional[str] = None
+    #: Offer PayPal in Braintree's form. Only once the merchant account accepts PayPal,
+    #: or buyers get a button whose payment is refused at the last step.
+    braintree_paypal: bool = False
 
     #: Run the purchase flow against a labelled stand-in, for developers who cannot
     #: get PayPal keys. Real keys win, and it never runs in production.

@@ -22,6 +22,8 @@ import "./effects.css";
 // globals.css: the precedence is stated by the import order instead of being
 // fought out with selector weight.
 import "./system.css";
+import "./payments.css";
+import "./studio.css";
 
 /* An editorial serif for display type. In a category where every product
    ships a geometric sans, this is the fastest signal that a person made

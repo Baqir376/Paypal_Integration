@@ -11,7 +11,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { PageNote, popToast } from "@/components/Pop";
+import { ConfirmButton, PageNote, popToast } from "@/components/Pop";
+import { BarList, CheckList, FactRow, SideCard } from "@/components/Studio";
 import { IconArrow } from "@/components/icons";
 import { Avatar, ErrorState, LoadingState, SectionHead } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
@@ -54,11 +55,12 @@ export default function TeamPage() {
   const canEditTeam = !me?.user || (access?.can_manage ?? false);
 
   /** Every change goes through here: run it, say what failed, show the truth. */
-  async function change(action: () => Promise<unknown>) {
+  async function change(action: () => Promise<unknown>, done?: string) {
     setNotice(null);
     try {
       await action();
       await load();
+      if (done) popToast(done);
       return true;
     } catch (e) {
       setNotice((e as ApiError).detail);
@@ -70,15 +72,18 @@ export default function TeamPage() {
     event.preventDefault();
     if (!name.trim()) return;
     setAdding(true);
-    if (await change(() => api.addRep(name))) setName("");
+    if (await change(() => api.addRep(name), `${name.trim()} joined the team`)) setName("");
     setAdding(false);
   }
 
   if (error) return <ErrorState message={error.detail} status={error.status} />;
   if (!team) return <LoadingState />;
 
+  const totalCalls = team.reduce((sum, snapshot) => sum + snapshot.calls, 0);
+  const star = team.find((snapshot) => snapshot.rep.is_top_performer);
+
   return (
-    <div className="page" data-status="TEAM" style={{ maxWidth: 940 }}>
+    <div className="page" data-status="TEAM" style={{ maxWidth: 1320 }}>
       <header className="page-head">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
@@ -94,6 +99,8 @@ export default function TeamPage() {
         </div>
       </header>
 
+      <div className="split">
+      <div style={{ minWidth: 0 }}>
       {canEditTeam && (
       <form
         onSubmit={add}
@@ -150,8 +157,17 @@ export default function TeamPage() {
                 key={snapshot.rep.id}
                 snapshot={snapshot}
                 canEdit={canEditTeam}
-                onSave={(update) => change(() => api.editRep(snapshot.rep.id, update))}
-                onRemove={() => change(() => api.removeRep(snapshot.rep.id))}
+                onSave={(update) => change(() => api.editRep(snapshot.rep.id, update), `Saved ${update.name.trim()}`)}
+                onRemove={async () => {
+                  const removed = await change(() => api.removeRep(snapshot.rep.id));
+                  if (removed) {
+                    popToast(`Removed ${snapshot.rep.name}. Their calls are kept.`, "good", {
+                      label: "Undo",
+                      onClick: () => change(() => api.restoreRep(snapshot.rep.id), `${snapshot.rep.name} is back on the team`),
+                    });
+                  }
+                  return removed;
+                }}
               />
             ))}
           </div>
@@ -174,17 +190,19 @@ export default function TeamPage() {
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() =>
-                      change(() => api.setRole(member.id, member.role === "owner" ? "member" : "owner"))
+                      change(
+                        () => api.setRole(member.id, member.role === "owner" ? "member" : "owner"),
+                        `${member.name} is now ${member.role === "owner" ? "a member" : "an owner"}`,
+                      )
                     }
                   >
                     {member.role === "owner" ? "Make member" : "Make owner"}
                   </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => change(() => api.removeMember(member.id))}
-                  >
-                    Remove access
-                  </button>
+                  <ConfirmButton
+                    label="Remove access"
+                    confirmLabel="Confirm remove"
+                    onConfirm={() => change(() => api.removeMember(member.id), `${member.name} can no longer sign in`)}
+                  />
                 </>
               )}
             </div>
@@ -202,17 +220,23 @@ export default function TeamPage() {
                   {access.mail_enabled && (
                     <button
                       className="btn btn-ghost btn-sm"
-                      onClick={() => change(() => api.resendInvite(invite.id))}
+                      onClick={() =>
+                        change(async () => {
+                          const sent = await api.resendInvite(invite.id);
+                          if (sent && "email_sent" in sent && !sent.email_sent) {
+                            throw { detail: `The email to ${invite.email} could not be sent.` };
+                          }
+                        }, `Invite sent again to ${invite.email}`)
+                      }
                     >
                       Send again
                     </button>
                   )}
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => change(() => api.cancelInvite(invite.id))}
-                  >
-                    Cancel
-                  </button>
+                  <ConfirmButton
+                    label="Cancel"
+                    confirmLabel="Cancel invite"
+                    onConfirm={() => change(() => api.cancelInvite(invite.id), `Invite to ${invite.email} cancelled`)}
+                  />
                 </>
               )}
             </div>
@@ -231,7 +255,8 @@ export default function TeamPage() {
                   setNotice("The invite was saved, but the email could not be sent. Tell them directly, or send it again.");
                 }
                 if (made) {
-                  popToast(`Invited ${inviteEmail}`);
+                  // When the email failed, the notice above says so; "invited" would contradict it.
+                  if (sent || !access.mail_enabled) popToast(`Invited ${inviteEmail}`);
                   setInviteEmail("");
                   setInviteRep("");
                 }
@@ -294,7 +319,7 @@ export default function TeamPage() {
               {canEditTeam && (
                 <button
                   className="btn btn-sm"
-                  onClick={() => change(() => api.restoreRep(rep.id))}
+                  onClick={() => change(() => api.restoreRep(rep.id), `${rep.name} is back on the team`)}
                 >
                   Restore
                 </button>
@@ -303,6 +328,45 @@ export default function TeamPage() {
           ))}
         </section>
       )}
+      </div>
+
+      <aside className="split-side">
+        <SideCard title="At a glance">
+          <FactRow
+            facts={[
+              { label: team.length === 1 ? "person" : "people", value: team.length },
+              { label: totalCalls === 1 ? "call" : "calls", value: totalCalls },
+              { label: "removed", value: archived.length },
+            ]}
+          />
+        </SideCard>
+        {totalCalls > 0 && (
+          <SideCard title="Who has been analysed" hint="calls" index={1}>
+            <BarList
+              items={[...team]
+                .sort((a, b) => b.calls - a.calls)
+                .slice(0, 8)
+                .map((snapshot) => ({
+                  label: snapshot.rep.name,
+                  value: snapshot.calls,
+                  href: `/reps/${snapshot.rep.id}`,
+                  top: snapshot.rep.is_top_performer,
+                }))}
+            />
+            {star && <p className="side-empty" style={{ marginTop: 12 }}>{star.rep.name} sets the bar the team is measured against.</p>}
+          </SideCard>
+        )}
+        <SideCard title="Good to know" index={2}>
+          <CheckList
+            items={[
+              "A new name on an upload adds that person for you",
+              "Removing someone keeps their calls",
+              "You can restore anyone you removed",
+            ]}
+          />
+        </SideCard>
+      </aside>
+      </div>
     </div>
   );
 }

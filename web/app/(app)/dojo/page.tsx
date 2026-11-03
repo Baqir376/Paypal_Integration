@@ -35,7 +35,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import { PageNote } from "@/components/Pop";
+import { PageNote, popToast } from "@/components/Pop";
 import { ScoreRing } from "@/components/charts";
 import {
   IconArrow,
@@ -54,6 +54,7 @@ import {
   type OrbState,
 } from "@/components/system/Instruments";
 import { ErrorState, LoadingState } from "@/components/ui";
+import { WorkingScene } from "@/components/Working";
 import { ApiError, api, streamDojoTurn } from "@/lib/api";
 import { AXIS_LABELS, cx, percent } from "@/lib/format";
 import {
@@ -191,11 +192,10 @@ function Dojo() {
       // browser has no acoustic model for this tag, which is a real and common
       // outcome for ur-PK, and the rep needs to know to type instead.
       if (event?.error === "language-not-supported") {
-        setNotice(
-          `This browser cannot recognise ${lang.label} (${lang.tag}) speech. Type the turn instead, or switch to English — the scoring is identical either way.`,
-        );
+        // A toast, because the notice line only exists on the briefing, not in a session.
+        popToast(`This browser cannot recognise ${lang.label} speech. Type your turn instead.`, "bad");
       } else if (event?.error === "not-allowed") {
-        setNotice("Microphone permission was refused. Type your turn instead.");
+        popToast("Microphone permission was refused. Type your turn instead.", "bad");
       }
     };
     instance.onend = () => setListening(false);
@@ -297,7 +297,7 @@ function Dojo() {
           // A quota, not a conversation. Shown as advice rather than let the
           // buyer say "sorry, could you say that again?" on every turn, which
           // reads as a broken product instead of a limit that clears shortly.
-          onThrottled: (detail) => setNotice(detail),
+          onThrottled: (detail) => popToast(detail, "bad"),
           onSession: (updated) => {
             setSession(updated);
             setStreaming("");
@@ -305,8 +305,11 @@ function Dojo() {
         },
       );
       if (reply.trim()) speak(reply.trim());
-    } catch (e) {
-      setError(e as ApiError);
+    } catch {
+      // Their words go back in the box: nobody should have to retype a line they meant.
+      setDraft(text);
+      setStreaming("");
+      popToast("Your message did not send. It is back in the box, so try again.", "bad");
     } finally {
       setBusy(false);
     }
@@ -320,12 +323,29 @@ function Dojo() {
       setSession(scored);
       setFinished(true);
       stopSpeaking();
-    } catch (e) {
-      setError(e as ApiError);
+    } catch {
+      popToast("The session could not be scored. It is still open, so try again.", "bad");
     } finally {
       setBusy(false);
     }
   }
+
+  // A session lives in this page. Leaving silently would lose it, and the buyer's voice
+  // and the microphone must not carry on after the page has gone.
+  useEffect(() => {
+    if (!session || finished) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [session, finished]);
+
+  useEffect(
+    () => () => {
+      stopSpeaking();
+      recognition.current?.stop?.();
+    },
+    [],
+  );
 
   /* --- Instruments --------------------------------------------------- */
 
@@ -486,6 +506,19 @@ function Dojo() {
               {busy ? "Building the buyer…" : "Start the session"}
               {!busy && <IconArrow size={13} />}
             </button>
+
+            {busy && (
+              <div style={{ marginTop: 14 }}>
+                <WorkingScene
+                  title="Building your buyer"
+                  steps={[
+                    `Reading ${rep?.rep.name.split(" ")[0] ?? "the"}'s calls`.replace("the's", "the"),
+                    "Pulling out the objections never resolved",
+                    "Building an opponent around them",
+                  ]}
+                />
+              </div>
+            )}
 
             {rep && (
               <p style={{ fontSize: 12.5, color: "var(--ink-3)", margin: "14px 0 0" }}>

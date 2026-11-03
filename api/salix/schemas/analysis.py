@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from .common import (
     CallStage,
@@ -29,6 +29,10 @@ class StageSpan(SalixModel):
 
 
 class Objection(SalixModel):
+    # Models like to add a "stage" here. Ignoring it loses nothing, and refusing it costs
+    # a full round trip to the model on every call where it happens.
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
     id: str
     category: ObjectionCategory
     text: str = Field(description="The objection in the buyer's own words")

@@ -9,14 +9,17 @@
  */
 
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import { Burst, InfoTip, PageNote, popToast } from "@/components/Pop";
+import { IconCheck, IconCoin } from "@/components/icons";
+import { PaymentSuccess } from "@/components/PaymentSuccess";
+import { NoteWindow, PageNote, useCountUp } from "@/components/Pop";
+import { BalanceTrend, CheckList, JourneySteps, SideCard } from "@/components/Studio";
 import { ErrorState, LoadingState, SectionHead } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { shortDate } from "@/lib/format";
-import type { BillingState } from "@/lib/types";
+import type { BillingState, OrderResult } from "@/lib/types";
 
 /** Braintree's hosted payment form. Card details stay between the buyer and Braintree. */
 const DROP_IN = "https://js.braintreegateway.com/web/dropin/1.44.1/js/dropin.min.js";
@@ -58,6 +61,92 @@ function PayPalLabel({ children }: { children?: React.ReactNode }) {
   );
 }
 
+type Pack = BillingState["packs"][number];
+
+/** One pack, leaning towards the pointer with a light that follows it. */
+function PackCard({
+  pack,
+  index,
+  best,
+  save,
+  callCost,
+  children,
+}: {
+  pack: Pack;
+  index: number;
+  best: boolean;
+  /** Percent cheaper per credit than the dearest pack. */
+  save: number;
+  callCost: number;
+  children: React.ReactNode;
+}) {
+  const reduced = useReducedMotion();
+  const shown = useCountUp(pack.credits, { delay: 0.15 + index * 0.08 });
+  const springy = { stiffness: 220, damping: 20 };
+  const rotateX = useSpring(useMotionValue(0), springy);
+  const rotateY = useSpring(useMotionValue(0), springy);
+  const recordings = Math.floor(pack.credits / callCost);
+
+  function lean(event: React.PointerEvent<HTMLElement>) {
+    const box = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - box.left;
+    const y = event.clientY - box.top;
+    event.currentTarget.style.setProperty("--x", `${x}px`);
+    event.currentTarget.style.setProperty("--y", `${y}px`);
+    if (reduced || event.pointerType !== "mouse") return;
+    rotateY.set((x / box.width - 0.5) * 9);
+    rotateX.set((0.5 - y / box.height) * 9);
+  }
+
+  return (
+    <motion.section
+      className="pack panel"
+      data-best={best}
+      style={{ rotateX, rotateY }}
+      initial={{ opacity: 0, y: 34, scale: 0.92 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ y: -6 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22, delay: index * 0.08 }}
+      onPointerMove={lean}
+      onPointerLeave={() => {
+        rotateX.set(0);
+        rotateY.set(0);
+      }}
+    >
+      <span className="pack-shine" aria-hidden="true" />
+      {best && <span className="pack-ring" aria-hidden="true" />}
+      {best && <span className="pack-best">Best value</span>}
+      <div className="eyebrow">
+        {pack.label}
+        {save > 0 && <span className="pack-save">Save {save}%</span>}
+      </div>
+      <div className="pack-credits num">
+        {shown}
+        <small>credits</small>
+      </div>
+      <div className="pack-price num">
+        {pack.currency} {pack.price}
+        <small>{(Number(pack.price) / pack.credits).toFixed(2)} each</small>
+      </div>
+      <ul className="pack-perks">
+        <li>
+          <IconCheck size={13} />
+          {recordings} {recordings === 1 ? "recording" : "recordings"} analysed
+        </li>
+        <li>
+          <IconCheck size={13} />
+          Score and coaching plan on each
+        </li>
+        <li>
+          <IconCheck size={13} />
+          Credit back if an analysis fails
+        </li>
+      </ul>
+      {children}
+    </motion.section>
+  );
+}
+
 function BillingPage() {
   const cancelled = useSearchParams().get("cancelled") === "1";
   const [state, setState] = useState<BillingState | null>(null);
@@ -66,7 +155,9 @@ function BillingPage() {
   const [failure, setFailure] = useState<string | null>(null);
   /** The pack being paid for through Braintree's form, once it is open. */
   const [paying, setPaying] = useState<string | null>(null);
-  const [added, setAdded] = useState<number | null>(null);
+  /** A Braintree payment that just completed, for the success window. */
+  const [paid, setPaid] = useState<OrderResult | null>(null);
+  const [celebrating, setCelebrating] = useState(false);
   /** The pack in the checkout pop-up, before leaving for PayPal. */
   const [checkout, setCheckout] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement | null>(null);
@@ -96,7 +187,7 @@ function BillingPage() {
   async function openBraintree(packId: string) {
     setBuying(packId);
     setFailure(null);
-    setAdded(null);
+    const pack = state?.packs.find((candidate) => candidate.id === packId);
     try {
       await dropIn.current?.teardown();
       dropIn.current = null;
@@ -109,6 +200,10 @@ function BillingPage() {
       dropIn.current = await library.create({
         authorization: client_token,
         container: dropInBox.current,
+        // PayPal as a wallet inside Braintree's form, for this pack's server-set price.
+        ...(state?.paypal_wallet && pack
+          ? { paypal: { flow: "checkout", amount: pack.price, currency: pack.currency } }
+          : {}),
       });
     } catch (e) {
       setPaying(null);
@@ -126,7 +221,10 @@ function BillingPage() {
       const { nonce } = await dropIn.current.requestPaymentMethod();
       const result = await api.braintreePay(paying, nonce);
       if (result.status === "completed") {
-        setAdded(result.credits);
+        setPaid(result);
+        setCelebrating(true);
+        // The balance in the rail is the Shell's, and this page did not navigate.
+        window.dispatchEvent(new Event("salix:credits"));
         setPaying(null);
         await dropIn.current.teardown();
         dropIn.current = null;
@@ -145,13 +243,6 @@ function BillingPage() {
     if (checkout) dialog.current?.showModal();
     else dialog.current?.close();
   }, [checkout]);
-
-  useEffect(() => {
-    if (added === null) return;
-    popToast(`${added} credits added`);
-    // The balance in the rail is the Shell's, and this page did not navigate.
-    window.dispatchEvent(new Event("salix:credits"));
-  }, [added]);
 
   async function buy(packId: string) {
     if (state?.provider === "braintree") return openBraintree(packId);
@@ -178,59 +269,94 @@ function BillingPage() {
   const unitPrice = (pack: { price: string; credits: number }) => Number(pack.price) / pack.credits;
   const bestValue = state.packs.reduce((best, pack) => (unitPrice(pack) < unitPrice(best) ? pack : best), state.packs[0]);
   const viaPayPal = state.provider !== "braintree";
+  const dearest = Math.max(...state.packs.map(unitPrice));
+  const recordingsLeft = Math.floor(state.balance / state.call_cost);
 
   return (
-    <div className="page" data-status="CREDITS" style={{ maxWidth: 940 }}>
-      <header className="page-head">
-        <div>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>
-            Credits
-          </div>
-          <h1 className="display d2" style={{ margin: 0 }}>
-            <motion.span
-              key={state.balance}
-              className="num"
-              style={{ display: "inline-block" }}
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 320, damping: 16 }}
-            >
-              {state.balance}
-            </motion.span>{" "}
+    <div className="page" data-status="CREDITS" style={{ maxWidth: 1320 }}>
+      <motion.header
+        className="credit-hero"
+        initial={{ opacity: 0, y: 22, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 240, damping: 24 }}
+      >
+        <div className="credit-hero-glow" aria-hidden="true" />
+        <div className="credit-hero-main">
+          <div className="eyebrow">Your credits</div>
+          <h1 className="credit-hero-number">
+            <Balance value={state.balance} />
             {state.balance === 1 ? "credit" : "credits"} left
           </h1>
-          <PageNote>
-            {state.enforced
-              ? `Each recording uses ${state.call_cost} credit, and comes with a score and a coaching plan. If an analysis fails, the credit is returned.`
-              : "Uploads are free on this deployment, so credits are not being used."}
-          </PageNote>
-        </div>
-      </header>
-
-      {viaPayPal && state.can_purchase && (
-        <div className="pay-status" data-simulated={state.simulated}>
-          <span className="pay-status-dot" aria-hidden="true" />
-          <strong>
-            {state.simulated ? "Simulated payments" : state.environment === "sandbox" ? "PayPal sandbox" : "PayPal"}
-          </strong>
-          {(state.simulated || state.environment === "sandbox") && <span>No real money moves</span>}
-          <InfoTip label="About these payments" align="end">
-            {state.simulated ? (
-              <>
-                <strong>Integrated through APIMatic.</strong> Orders go through APIMatic&apos;s PayPal Server SDK, but
-                they are answered on this machine, so they do not reach PayPal and the credits are free. Add PayPal
-                sandbox keys and the same code talks to PayPal.
-              </>
-            ) : (
-              <>
-                <strong>Integrated through APIMatic.</strong> Orders are created and captured with APIMatic&apos;s PayPal
-                Server SDK. {state.environment === "sandbox" && "Use a sandbox buyer account."}
-              </>
+          <p className="credit-hero-sub" data-empty={state.enforced && recordingsLeft === 0}>
+            {!state.enforced
+              ? "Uploads are free on this deployment."
+              : recordingsLeft === 0
+                ? "You are out of credits. Pick a pack to analyse your next call."
+                : `Enough for ${recordingsLeft} more ${recordingsLeft === 1 ? "recording" : "recordings"}.`}
+          </p>
+          <div className="credit-hero-row">
+            <PageNote>
+              {state.enforced
+                ? `Each recording uses ${state.call_cost} credit, and comes with a score and a coaching plan. If an analysis fails, the credit is returned.`
+                : "Uploads are free on this deployment, so credits are not being used."}
+            </PageNote>
+            {viaPayPal && state.can_purchase && (
+              <NoteWindow
+                title={state.simulated ? "Simulated payments" : state.environment === "sandbox" ? "PayPal sandbox" : "PayPal"}
+                eyebrow="About these payments"
+                triggerProps={{
+                  className: "pay-status pay-status-button",
+                  "data-simulated": state.simulated,
+                  "aria-label": "About these payments",
+                }}
+                trigger={
+                  <>
+                    <span className="pay-status-dot" aria-hidden="true" />
+                    <strong>
+                      {state.simulated ? "Simulated payments" : state.environment === "sandbox" ? "PayPal sandbox" : "PayPal"}
+                    </strong>
+                    {(state.simulated || state.environment === "sandbox") && <span>No real money moves</span>}
+                    <span className="info-dot" aria-hidden="true">
+                      i
+                    </span>
+                  </>
+                }
+              >
+                {state.simulated ? (
+                  <p>
+                    <strong>Integrated through APIMatic.</strong> Orders go through APIMatic&apos;s PayPal Server SDK, but
+                    they are answered on this machine, so they do not reach PayPal and the credits are free. Add PayPal
+                    sandbox keys and the same code talks to PayPal.
+                  </p>
+                ) : (
+                  <p>
+                    <strong>Integrated through APIMatic.</strong> Orders are created and captured with APIMatic&apos;s PayPal
+                    Server SDK.
+                    {state.environment === "sandbox" && " This is PayPal's test environment, so no real money moves. Pay with a sandbox buyer account, not your own PayPal login."}
+                  </p>
+                )}
+                <JourneySteps
+                  steps={[
+                    { label: "Salix creates the order" },
+                    { label: state.simulated ? "You approve the simulated checkout" : "You approve it on PayPal" },
+                    { label: "Salix captures it and adds your credits" },
+                  ]}
+                />
+              </NoteWindow>
             )}
-          </InfoTip>
+          </div>
         </div>
-      )}
+        <div className="credit-orbit" aria-hidden="true">
+          <i />
+          <i />
+          <span className="credit-coin">
+            <IconCoin size={28} />
+          </span>
+        </div>
+      </motion.header>
 
+      <div className="split">
+      <div style={{ minWidth: 0 }}>
       {cancelled && <Notice>You cancelled at PayPal, so nothing was charged.</Notice>}
       {failure && <Notice tone="var(--rose)">{failure}</Notice>}
       {!state.can_purchase && (
@@ -240,35 +366,24 @@ function BillingPage() {
         </Notice>
       )}
       {!state.can_buy && <Notice>Only your team owner can buy credits.</Notice>}
-      {added !== null && <Notice tone="var(--sage)">{added} credits added.</Notice>}
       {state.provider === "braintree" && state.environment === "sandbox" && (
         <Notice>
           Braintree sandbox, PayPal&apos;s payment gateway. No real money moves. Use test
-          card 4111 1111 1111 1111 with any future expiry.
+          card 4111 1111 1111 1111 with any future expiry
+          {state.paypal_wallet ? ", or choose PayPal, which Braintree mocks in its sandbox." : "."}
         </Notice>
       )}
 
       <div className="packs">
         {state.packs.map((pack, index) => (
-          <motion.section
+          <PackCard
             key={pack.id}
-            className="pack panel"
-            data-best={pack.id === bestValue.id}
-            initial={{ opacity: 0, y: 24, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            whileHover={{ y: -5 }}
-            transition={{ type: "spring", stiffness: 300, damping: 22, delay: index * 0.06 }}
+            pack={pack}
+            index={index}
+            best={pack.id === bestValue.id}
+            save={Math.round((1 - unitPrice(pack) / dearest) * 100)}
+            callCost={state.call_cost}
           >
-            {pack.id === bestValue.id && <span className="pack-best">Best value</span>}
-            <div className="eyebrow">{pack.label}</div>
-            <div className="pack-credits num">
-              {pack.credits}
-              <small>credits</small>
-            </div>
-            <div className="pack-price num">
-              {pack.currency} {pack.price}
-              <small>{unitPrice(pack).toFixed(2)} each</small>
-            </div>
             <motion.button
               className={viaPayPal ? "paypal-button" : "btn btn-primary"}
               style={viaPayPal ? undefined : { width: "100%", justifyContent: "center" }}
@@ -277,9 +392,9 @@ function BillingPage() {
               whileTap={{ scale: 0.97 }}
               aria-label={viaPayPal ? `Pay with PayPal: ${pack.label}` : undefined}
             >
-              {viaPayPal ? <PayPalLabel>Pay with</PayPalLabel> : buying === pack.id ? "Opening checkout…" : "Buy with Braintree"}
+              {viaPayPal ? <PayPalLabel>Pay with</PayPalLabel> : buying === pack.id ? "Opening checkout…" : state.paypal_wallet ? "Buy with PayPal or card" : "Buy with Braintree"}
             </motion.button>
-          </motion.section>
+          </PackCard>
         ))}
       </div>
 
@@ -334,7 +449,18 @@ function BillingPage() {
         )}
       </dialog>
 
-      {added !== null && <div className="burst-anchor" key={added}><Burst /></div>}
+      {paid && (
+        <PaymentSuccess
+          open={celebrating}
+          onClose={() => setCelebrating(false)}
+          credits={paid.credits}
+          balance={paid.balance}
+          orderId={paid.order_id}
+          amount={paid.amount}
+          currency={paid.currency}
+          method={state.environment === "sandbox" ? "Braintree sandbox, test money" : "Braintree"}
+        />
+      )}
 
       {paying && (
         <section className="panel" style={{ padding: "18px 19px", marginBottom: 22 }}>
@@ -363,28 +489,66 @@ function BillingPage() {
           <div className="scroll-x">
             <table className="table">
               <tbody>
-                {state.history.map((entry) => (
-                  <tr key={entry.id}>
+                {state.history.map((entry, index) => (
+                  <motion.tr
+                    key={entry.id}
+                    initial={{ opacity: 0, x: -14 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.32, delay: 0.25 + Math.min(index, 8) * 0.05 }}
+                  >
                     <td>{REASONS[entry.reason] ?? entry.reason}</td>
                     <td style={{ color: "var(--ink-3)" }}>{shortDate(entry.created_at)}</td>
-                    <td
-                      className="num"
-                      style={{
-                        textAlign: "right",
-                        color: entry.delta > 0 ? "var(--sage)" : "var(--ink-2)",
-                      }}
-                    >
-                      {entry.delta > 0 ? `+${entry.delta}` : entry.delta}
+                    <td className="num" style={{ textAlign: "right" }}>
+                      <span className="ledger-delta" data-up={entry.delta > 0}>
+                        {entry.delta > 0 ? `+${entry.delta}` : entry.delta}
+                      </span>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
       </section>
+      </div>
+
+      <aside className="split-side">
+        <SideCard title="Your balance" hint={state.history.length ? `last ${state.history.length} ${state.history.length === 1 ? "change" : "changes"}` : undefined}>
+          <BalanceTrend balance={state.balance} history={state.history} />
+        </SideCard>
+        <SideCard title="What one credit does" index={1}>
+          <JourneySteps
+            steps={[
+              { label: "You upload a recording" },
+              { label: "Salix scores the call" },
+              { label: "You get a coaching plan" },
+              { label: "If it fails, the credit comes back" },
+            ]}
+          />
+        </SideCard>
+        <SideCard title="Paying safely" index={2}>
+          <CheckList
+            items={[
+              "Prices come from our server, never the browser",
+              "A payment can only add its credits once",
+              viaPayPal ? "Your payment details stay with PayPal" : "Your card details stay with Braintree",
+            ]}
+          />
+        </SideCard>
+      </aside>
+      </div>
     </div>
   );
+}
+
+/** Counts up from where it last stood, so a new balance visibly lands. */
+function Balance({ value }: { value: number }) {
+  const before = useRef(0);
+  const shown = useCountUp(value, { from: before.current });
+  useEffect(() => {
+    before.current = value;
+  }, [value]);
+  return <span className="num">{shown}</span>;
 }
 
 function Notice({

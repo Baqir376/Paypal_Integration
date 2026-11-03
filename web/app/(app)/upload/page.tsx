@@ -13,7 +13,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { PageNote } from "@/components/Pop";
+import { PageNote, popToast } from "@/components/Pop";
+import { PipelineProgress } from "@/components/Working";
+import { CheckList, JourneySteps, SideCard } from "@/components/Studio";
 import { IconArrow, IconCheck, IconUpload, IconWarning } from "@/components/icons";
 import { ErrorState } from "@/components/ui";
 import { ApiError, api, subscribeToPipeline } from "@/lib/api";
@@ -151,6 +153,10 @@ export default function UploadPage() {
       const response = await api.upload(form);
       setCallId(response.call_id);
       setRepId(response.rep_id);
+      popToast("Recording received. The analysis has started.");
+      // The balance in the rail is the Shell's, and this upload just spent a credit.
+      window.dispatchEvent(new Event("salix:credits"));
+      let sawTheEnd = false;
       unsubscribe.current = subscribeToPipeline(
         response.call_id,
         (pipelineEvent) => {
@@ -161,11 +167,19 @@ export default function UploadPage() {
           });
           // A failed stage is not the end of the graph, only of the run: the
           // pipeline finishes what it can and says so in its last event.
+          if (pipelineEvent.stage === "done") sawTheEnd = true;
           if (pipelineEvent.stage === "done" && pipelineEvent.status === "failed") {
             setFailure(pipelineEvent.detail);
+            popToast("The analysis did not finish", "bad");
+          } else if (pipelineEvent.stage === "done") {
+            const gaps = (pipelineEvent.payload?.failed_stages as string[] | undefined) ?? [];
+            popToast(gaps.length ? "Finished, with some gaps" : "Analysis complete. Your score is ready.", gaps.length ? "bad" : "good");
           }
         },
-        () => setFinished(true),
+        () => {
+          setFinished(true);
+          if (!sawTheEnd) popToast("Lost the live view. The analysis keeps running.", "bad");
+        },
       );
     } catch (e) {
       setFailure((e as ApiError).detail);
@@ -178,6 +192,17 @@ export default function UploadPage() {
   if (error && !reps.length) return <ErrorState message={error.detail} status={error.status} />;
 
   const done = events.get("done");
+  // The server reports time since the run began. What a person wants to know is how
+  // long each step took, or a stall reads as every later step having been slow.
+  const stageTimes = new Map<StageKey, number>();
+  let reached = 0;
+  for (const stage of STAGES) {
+    const event = events.get(stage.key);
+    if (event && event.status !== "running" && event.status !== "pending" && event.elapsed_ms) {
+      stageTimes.set(stage.key, Math.max(event.elapsed_ms - reached, 0));
+      reached = Math.max(reached, event.elapsed_ms);
+    }
+  }
   const degraded = (done?.payload?.failed_stages as string[] | undefined) ?? [];
   const outOfCredits = !!billing?.enforced && billing.balance < billing.call_cost;
   const typed = salesperson.trim().replace(/(['’]s)?\s+call$/i, "").toLowerCase();
@@ -188,7 +213,7 @@ export default function UploadPage() {
   );
 
   return (
-    <div data-status="ANALYSE A CALL" className="page" style={{ maxWidth: 940 }}>
+    <div data-status="ANALYSE A CALL" className="page" style={{ maxWidth: 1320 }}>
       <header className="page-head">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
@@ -205,6 +230,8 @@ export default function UploadPage() {
         </div>
       </header>
 
+      <div className="split" data-single={!!callId || undefined}>
+      <div style={{ minWidth: 0 }}>
       {canTranscribe === false && (
         <div
           className="panel"
@@ -276,7 +303,7 @@ export default function UploadPage() {
               // validated here like any other.
               chooseFile(e.dataTransfer.files?.[0] ?? null);
             }}
-            className="panel"
+            className="panel dropzone"
             style={{
               display: "grid",
               placeItems: "center",
@@ -286,7 +313,7 @@ export default function UploadPage() {
               borderStyle: "dashed",
               borderWidth: 1.5,
               borderColor: dragging ? "var(--willow)" : "var(--rule-strong)",
-              background: dragging ? "var(--willow-wash)" : "var(--paper-2)",
+              background: dragging ? "var(--willow-wash)" : "var(--glass)",
               transition: "border-color 150ms ease, background 150ms ease",
             }}
           >
@@ -397,9 +424,18 @@ export default function UploadPage() {
       ) : (
         <>
           <section className="panel" style={{ padding: "22px 24px", marginBottom: 20 }}>
-            <div className="eyebrow" style={{ marginBottom: 16 }}>
+            <div className="eyebrow" style={{ marginBottom: 12 }}>
               Analysis graph
             </div>
+
+            <PipelineProgress
+              finished={STAGES.filter((stage) => ["ok", "failed", "skipped"].includes(events.get(stage.key)?.status ?? "")).length}
+              total={STAGES.length}
+              current={STAGES.find((stage) => events.get(stage.key)?.status === "running")?.label}
+              agent={STAGES.find((stage) => events.get(stage.key)?.status === "running")?.agent}
+              active={!finished}
+              totalMs={done?.elapsed_ms}
+            />
 
             <div style={{ display: "grid", gap: 3 }}>
               {STAGES.map((stage, index) => {
@@ -413,7 +449,7 @@ export default function UploadPage() {
                     agent={stage.agent}
                     status={status}
                     detail={event?.detail}
-                    elapsed={event?.elapsed_ms}
+                    elapsed={stageTimes.get(stage.key)}
                     last={index === STAGES.length - 1}
                   />
                 );
@@ -440,6 +476,9 @@ export default function UploadPage() {
                   Your credit has been returned.
                 </p>
               )}
+              <a href="/upload" className="btn btn-sm" style={{ marginTop: 12 }}>
+                Try another recording
+              </a>
             </div>
           )}
 
@@ -456,7 +495,11 @@ export default function UploadPage() {
                 borderColor: "color-mix(in oklab, var(--willow) 40%, var(--rule))",
               }}
             >
-              <IconCheck size={20} style={{ color: "var(--willow)" }} />
+              {done ? (
+                <IconCheck size={20} style={{ color: "var(--willow)" }} />
+              ) : (
+                <IconWarning size={20} style={{ color: "var(--ember)" }} />
+              )}
               <div style={{ flex: 1, minWidth: 220 }}>
                 <div style={{ fontSize: 15, fontWeight: 500 }}>
                   {!done
@@ -477,6 +520,9 @@ export default function UploadPage() {
                   See the coaching plan
                 </Link>
               )}
+              <a href="/upload" className="btn btn-ghost">
+                Analyse another
+              </a>
               <button
                 className="btn btn-primary"
                 onClick={() => router.push(`/calls/${callId}`)}
@@ -488,6 +534,25 @@ export default function UploadPage() {
           )}
         </>
       )}
+      </div>
+
+      {!callId && (
+        <aside className="split-side">
+          <SideCard title="What happens next" hint={`${STAGES.length} steps`}>
+            <JourneySteps steps={STAGES.map((stage) => ({ label: stage.label }))} />
+          </SideCard>
+          <SideCard title="Before you upload" index={1}>
+            <CheckList
+              items={[
+                "English, Urdu and Roman Urdu are detected for you",
+                "Say whose call it is, and new names are added",
+                "A failed analysis returns its credit",
+              ]}
+            />
+          </SideCard>
+        </aside>
+      )}
+      </div>
     </div>
   );
 }
@@ -576,7 +641,7 @@ function StageRow({
             {label}
           </span>
           <span className="eyebrow">{agent}</span>
-          {elapsed != null && elapsed > 0 && (
+          {elapsed != null && elapsed >= 50 && (
             <span
               className="num"
               style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-4)" }}

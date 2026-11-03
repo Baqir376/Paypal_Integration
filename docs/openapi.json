@@ -4076,6 +4076,10 @@
               }
             ]
           },
+          "paypal_wallet": {
+            "type": "boolean",
+            "default": false
+          },
           "can_buy": {
             "type": "boolean",
             "default": true,
@@ -5074,6 +5078,14 @@
             "type": "string",
             "default": "",
             "description": "Why the credits were not added, if they were not."
+          },
+          "amount": {
+            "type": "string",
+            "default": ""
+          },
+          "currency": {
+            "type": "string",
+            "default": ""
           }
         },
         "additionalProperties": false,

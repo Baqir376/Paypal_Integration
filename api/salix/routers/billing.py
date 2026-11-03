@@ -41,6 +41,8 @@ class BillingState(SalixModel):
     simulated: bool = False
     #: "paypal", "braintree", "simulator", or None when nothing can take payment.
     provider: Optional[str] = None
+    #: Braintree's form also offers PayPal, not only cards.
+    paypal_wallet: bool = False
     #: Whether this person may. Buying is for the team's owner.
     can_buy: bool = True
     environment: str
@@ -71,6 +73,9 @@ class OrderResult(SalixModel):
     credits: int
     balance: int
     detail: str = ""
+    #: What the order was for, as a decimal string, for the receipt.
+    amount: str = ""
+    currency: str = ""
 
 
 class ReconcileResult(SalixModel):
@@ -90,6 +95,7 @@ async def state(request: Request, session: Session, org_id: OrgId) -> BillingSta
         can_buy=context is None or context.role == "owner",
         simulated=settings.paypal_simulated,
         provider=settings.payment_provider,
+        paypal_wallet=settings.payment_provider == "braintree" and settings.braintree_paypal,
         enforced=settings.billing_enforced,
         can_purchase=settings.payment_provider is not None,
         environment=settings.paypal_mode,
@@ -187,6 +193,8 @@ async def capture(session: Session, org_id: OrgId, order_id: str) -> OrderResult
         credits=row.credits if row.status == credits.COMPLETED else 0,
         balance=await credits.balance(session, org_id),
         detail=_DETAILS.get(row.status, ""),
+        amount=row.amount,
+        currency=row.currency,
     )
 
 
@@ -276,6 +284,8 @@ async def braintree_pay(session: Session, org_id: OrgId, request: BraintreePayRe
         credits=row.credits if row.status == credits.COMPLETED else 0,
         balance=await credits.balance(session, org_id),
         detail=_DETAILS.get(row.status, ""),
+        amount=row.amount,
+        currency=row.currency,
     )
 
 

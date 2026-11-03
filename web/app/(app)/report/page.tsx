@@ -14,6 +14,8 @@ import { useEffect, useState } from "react";
 import { Sparkline, TalkRatioBar } from "@/components/charts";
 import { IconArrow, IconWarning } from "@/components/icons";
 import { ErrorState, LoadingState } from "@/components/ui";
+import { WorkingScene } from "@/components/Working";
+import { popToast } from "@/components/Pop";
 import { ApiError, api } from "@/lib/api";
 import {
   AXIS_LABELS,
@@ -42,12 +44,29 @@ export default function ReportPage() {
     setGenerating(true);
     try {
       setReport(await api.generateReport());
-    } catch (e) {
-      setError(e as ApiError);
+      popToast("Your cycle report is ready");
+    } catch {
+      // A failed attempt must never take away a report that is already on screen.
+      popToast(report ? "Could not regenerate. Your current report is still here." : "The report could not be written. Try again.", "bad");
     } finally {
       setGenerating(false);
     }
   }
+
+  const writing = generating && (
+    <div style={{ marginBottom: 22 }}>
+      <WorkingScene
+        title="Writing the cycle report"
+        steps={[
+          "Gathering every analysed call in the cycle",
+          "Computing the team's numbers",
+          "Linking win-rate lift to the plays that were run",
+          "Collecting the deals at risk",
+          "Writing the story around all of it",
+        ]}
+      />
+    </div>
+  );
 
   if (error) return <ErrorState message={error.detail} status={error.status} />;
 
@@ -70,10 +89,12 @@ export default function ReportPage() {
             team's numbers, attribute win-rate lift to the plays that were run,
             collect the deals at risk, and write the narrative around all of it.
           </p>
-          <button className="btn btn-primary" onClick={generate} disabled={generating}>
-            {generating ? "Writing the report…" : "Generate the cycle report"}
-            {!generating && <IconArrow size={13} />}
-          </button>
+          {writing || (
+            <button className="btn btn-primary" onClick={generate}>
+              Generate the cycle report
+              <IconArrow size={13} />
+            </button>
+          )}
         </div>
       </div>
     );
@@ -82,9 +103,9 @@ export default function ReportPage() {
   const { team } = report;
 
   return (
-    <div data-status="CYCLE REPORT" className="page" style={{ maxWidth: 900 }}>
+    <div data-status="CYCLE REPORT" className="page" style={{ maxWidth: 980, marginInline: "auto" }}>
       <CalibrationPanel />
-      <header className="page-head no-print">
+      <header className="page-head">
         <div>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
             {report.cycle_label} · {report.period_start} to {report.period_end}
@@ -93,7 +114,7 @@ export default function ReportPage() {
             Cycle report
           </h1>
         </div>
-        <div style={{ display: "flex", gap: 9 }}>
+        <div className="no-print" style={{ display: "flex", gap: 9 }}>
           <button className="btn" onClick={() => window.print()}>
             Print
           </button>
@@ -102,6 +123,7 @@ export default function ReportPage() {
           </button>
         </div>
       </header>
+      {writing}
 
       <p
         className="display d3"
@@ -117,9 +139,9 @@ export default function ReportPage() {
 
       {/* --- Numbers ------------------------------------------------------ */}
       <section
+        className="report-numbers"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
           gap: 1,
           background: "var(--rule)",
           border: "1px solid var(--rule)",

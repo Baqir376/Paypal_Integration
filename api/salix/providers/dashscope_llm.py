@@ -119,7 +119,9 @@ class DashScopeLLM:
                 )
                 import asyncio
 
-                await asyncio.sleep(delay)
+                # No wait after the last attempt: nothing is coming after it.
+                if attempt < attempts:
+                    await asyncio.sleep(delay)
             except APIError as exc:
                 last = exc
                 status = getattr(exc, "status_code", None)
@@ -131,12 +133,14 @@ class DashScopeLLM:
                     )
                 import asyncio
 
-                await asyncio.sleep(1.0 * attempt)
+                if attempt < attempts:
+                    await asyncio.sleep(1.0 * attempt)
             except Exception as exc:  # noqa: BLE001 - surface as ProviderError
                 last = exc
                 import asyncio
 
-                await asyncio.sleep(0.5 * attempt)
+                if attempt < attempts:
+                    await asyncio.sleep(0.5 * attempt)
 
         raise ProviderError(
             self.settings.llm_provider_name, f"exhausted retries: {last}", retryable=True

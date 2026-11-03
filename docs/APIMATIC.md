@@ -8,6 +8,27 @@ Every PayPal Orders call goes through `paypal-server-sdk`, which APIMatic genera
 from PayPal's API definition. The only file that imports it is
 [`api/salix/billing/paypal.py`](../api/salix/billing/paypal.py).
 
+### It has run against PayPal's real sandbox
+
+On 2026-11-03 a real purchase went through this code, with PayPal sandbox keys:
+
+| Step | Evidence |
+| :-- | :-- |
+| `orders.create_order` in `paypal.py` | Order `9H555343TH507360E`, returned with a `payer-action` link to `sandbox.paypal.com` |
+| A sandbox buyer approved it on PayPal's own page | Returned to `/billing/return` |
+| `orders.capture_order` in `paypal.py` | Capture `9YY25602CS4125354`, USD 40.00, `COMPLETED`, read back from PayPal's API |
+| Salix's ledger | 25 credits granted, once |
+
+Sandbox only: no real money moved. To check it yourself with your own sandbox keys,
+follow the Quickstart, set `SALIX_PAYPAL_CLIENT_ID` and `SALIX_PAYPAL_CLIENT_SECRET`, and
+buy a pack using a sandbox **Personal** account. The order then appears under Event Logs
+in PayPal's developer dashboard. To see the SDK itself:
+
+```
+pip show paypal-server-sdk                     # 2.4.0
+grep -n "paypalserversdk" api/salix/billing/paypal.py
+```
+
 ## 2. The Context Plugin
 
 The ContextMatic plugin was installed in Claude Code and used to review that file
@@ -39,9 +60,8 @@ build.
 - The docs the plugin returned name the `rel:approve` link. The code also accepts
   `payer-action`, which comes from general knowledge of PayPal's API and was not
   confirmed by the plugin, so both are handled and tested.
-- None of this has run against PayPal's real sandbox, because PayPal does not open
-  accounts in Pakistan, where this was built. It runs in tests against a stand-in at
-  the HTTP layer. Add PayPal sandbox keys to `.env` and it is used automatically.
+- At the time of this review the code had only run in tests, against a stand-in at the
+  HTTP layer. It has since run against PayPal's real sandbox: see above.
 
 ## An SDK and docs portal for Salix's own API
 

@@ -57,11 +57,11 @@ const CHAPTERS: Chapter[] = [
     index: "01",
     spine: "Transcriptionist",
     title: "Hears who was speaking",
-    copy: "Qwen ASR with speaker diarization, submitted as an async task and polled to completion. Which voice belongs to the salesperson is then worked out from the shape of the conversation — who asks, who answers, who names the price — rather than from a label somebody remembered to set in the CRM.",
+    copy: "File transcription with speaker diarization, through Deepgram Nova-3 or Qwen ASR. Which voice belongs to the salesperson is then worked out from the shape of the conversation — who asks, who answers, who names the price — rather than from a label somebody remembered to set in the CRM.",
     plate: "--img-ch-01",
     specs: [
-      { label: "Model", value: "qwen-audio-3.0-asr-flash" },
-      { label: "Transport", value: "X-DashScope-Async" },
+      { label: "Model", value: "Deepgram Nova-3 or Qwen ASR" },
+      { label: "Languages", value: "English, Urdu, Roman Urdu" },
       { label: "Diarization", value: "2 speakers" },
       { label: "Timestamp resolution", value: "1 ms" },
     ],
@@ -86,7 +86,7 @@ const CHAPTERS: Chapter[] = [
     copy: "Stages, objections, MEDDIC coverage and commitments — each one citing the transcript segments it came from. Citations are hydrated against the real transcript, and a segment id that does not exist is treated as a fabrication: the agent is asked again with the list of ids it may actually use. A citation that still cannot be resolved is removed rather than displayed.",
     plate: "--img-ch-03",
     specs: [
-      { label: "Model", value: "qwen3.8-max" },
+      { label: "Model", value: "Gemini Flash-Lite, with failover" },
       { label: "Citation policy", value: "hydrate or drop" },
       { label: "On a bad id", value: "re-ask with legal ids" },
       { label: "Framework", value: "MEDDIC" },
@@ -597,7 +597,7 @@ export default function LandingPage() {
             href="/archive"
             index="C"
             title="The provenance"
-            copy="Where the measurements come from, what each Alibaba Cloud service is doing, and the corpus every claim on this page was computed against."
+            copy="Where the measurements come from, what each AI service is doing, and the corpus every claim on this page was computed against."
           />
         </div>
       </section>

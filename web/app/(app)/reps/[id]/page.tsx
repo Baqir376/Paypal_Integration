@@ -13,7 +13,11 @@ import { use, useEffect, useState } from "react";
 
 import { ScoreRing, SkillRadar, Sparkline, TalkRatioBar } from "@/components/charts";
 import { IconArrow, IconDojo, IconLink, IconSpark } from "@/components/icons";
+import { motion } from "framer-motion";
+
+import { popToast } from "@/components/Pop";
 import { Avatar, ErrorState, LoadingState, SectionHead } from "@/components/ui";
+import { WorkingScene } from "@/components/Working";
 import { ApiError, api } from "@/lib/api";
 import {
   AXIS_LABELS,
@@ -49,8 +53,10 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
     setCoachError(null);
     try {
       setPlan(await api.coach(id));
+      popToast("Your coaching plan is ready");
     } catch (e) {
       setCoachError((e as ApiError).detail);
+      popToast("The plan could not be written", "bad");
     } finally {
       setCoaching(false);
     }
@@ -193,7 +199,19 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
             hint={plan?.script?.grounded_in.length ? "Grounded in your team's winning calls" : undefined}
           />
           <div style={{ padding: "14px 18px 18px" }}>
-            {!plan && (
+            {coaching && (
+              <WorkingScene
+                title={`Writing ${rep.name.split(" ")[0]}'s coaching plan`}
+                steps={[
+                  `Finding where ${rep.name.split(" ")[0]} trails the team`,
+                  "Searching for how colleagues who won handled it",
+                  `Setting aside ${rep.name.split(" ")[0]}'s own habits`,
+                  "Writing a script from those real calls",
+                ]}
+              />
+            )}
+
+            {!plan && !coaching && (
               <div style={{ textAlign: "center", padding: "22px 0" }}>
                 <p className="prose-body" style={{ margin: "0 auto 16px", fontSize: 13.5 }}>
                   Salix will find where {rep.name.split(" ")[0]} trails the team,
@@ -205,8 +223,8 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
                   onClick={generatePlan}
                   disabled={coaching}
                 >
-                  {coaching ? "Reading the archive…" : "Generate the plan"}
-                  {!coaching && <IconArrow size={13} />}
+                  Generate the plan
+                  <IconArrow size={13} />
                 </button>
                 {coachError && (
                   <p style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 12 }}>
@@ -216,10 +234,18 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
               </div>
             )}
 
-            {plan && (
+            {plan && !coaching && (
               <>
-                <p
+                {coachError && (
+                  <p role="alert" style={{ color: "var(--rose)", fontSize: 12.5, margin: "0 0 12px" }}>
+                    {coachError}
+                  </p>
+                )}
+                <motion.p
                   className="display"
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   style={{
                     fontSize: 20,
                     margin: "0 0 16px",
@@ -229,11 +255,14 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
                   }}
                 >
                   {plan.diagnosis}
-                </p>
+                </motion.p>
 
-                {plan.gaps.map((gap) => (
-                  <div
+                {plan.gaps.map((gap, index) => (
+                  <motion.div
                     key={gap.axis}
+                    initial={{ opacity: 0, x: -16 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1], delay: 0.15 + index * 0.09 }}
                     style={{ padding: "11px 0", borderBottom: "1px solid var(--rule)" }}
                   >
                     <div
@@ -264,7 +293,7 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
                     <p style={{ fontSize: 12.8, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
                       {gap.explanation}
                     </p>
-                  </div>
+                  </motion.div>
                 ))}
 
                 {lastTest?.assessment && (
@@ -293,7 +322,7 @@ export default function RepPage({ params }: { params: Promise<{ id: string }> })
                     </Link>
                   )}
                   <button className="btn btn-sm" onClick={generatePlan} disabled={coaching}>
-                    {coaching ? "Regenerating…" : "Regenerate"}
+                    Regenerate
                   </button>
                 </div>
               </>

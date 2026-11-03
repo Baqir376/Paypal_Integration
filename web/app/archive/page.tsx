@@ -42,7 +42,7 @@ const STAGES = [
     time: "T+0",
     name: "Transcriptionist",
     detail:
-      "The recording is submitted to Qwen file transcription as an async task, polled to completion, and returned as diarized segments with millisecond boundaries. Which speaker is the salesperson is inferred from the conversation's shape, not from metadata.",
+      "The recording goes to a file transcription service, Deepgram Nova-3 or Qwen ASR, and comes back as diarized segments with millisecond boundaries. Which speaker is the salesperson is inferred from the conversation's shape, not from metadata.",
     emits: "Transcript · segments[] · speaker map",
   },
   {
@@ -82,48 +82,48 @@ const STAGES = [
   },
 ];
 
-/** The Alibaba Cloud service manifest. */
+/** What each AI service does. Which one is answering right now is read from /api/health. */
 const SERVICES = [
   {
     index: "I",
     capability: "File transcription with diarization",
-    model: "qwen-audio-3.0-asr-flash-filetrans",
-    note: "Native DashScope async task API — submit, poll, fetch. The only stage whose failure is fatal, because without a transcript there is nothing to analyse.",
-    surface: "X-DashScope-Async: enable",
+    model: "Deepgram Nova-3 or Qwen ASR",
+    note: "Speakers are separated in the transcript itself. The only stage whose failure is fatal, because without a transcript there is nothing to analyse.",
+    surface: "File transcription API",
   },
   {
     index: "II",
     capability: "Anatomy, plays, coaching, reporting",
-    model: "qwen3.8-max",
+    model: "Gemini Flash-Lite, with automatic failover",
     note: "Every structured output is validated against the Pydantic contract, and a failure is returned to the model with the validator's own complaint rather than silently discarded.",
     surface: "OpenAI-compatible endpoint",
   },
   {
     index: "III",
     capability: "High-volume and low-latency passes",
-    model: "qwen-plus",
+    model: "Any OpenAI-compatible model",
     note: "Where the work is bulk classification rather than reasoning, the cheaper model does it. Which model produced a given field is recorded, not inferred.",
     surface: "OpenAI-compatible endpoint",
   },
   {
     index: "IV",
     capability: "Semantic retrieval over moments",
-    model: "text-embedding-v4",
-    note: "1024-dimensional vectors over conversational moments, searched with cosine similarity and diversified with MMR so a coaching plan is not five phrasings of one sentence.",
+    model: "Gemini or Qwen embeddings",
+    note: "Dense vectors over conversational moments, searched with cosine similarity and diversified with MMR so a coaching plan is not five phrasings of one sentence.",
     surface: "Vector index · SQLite / Postgres",
   },
   {
     index: "V",
     capability: "The Dojo buyer's voice",
-    model: "qwen3-tts-instruct-flash",
+    model: "Neural voices, Edge TTS or Qwen TTS",
     note: "The practice opponent speaks. Where no key is configured the browser's own speech synthesis stands in, and the interface says which is talking.",
     surface: "Streaming synthesis",
   },
   {
     index: "VI",
     capability: "Realtime ASR (optional Dojo path)",
-    model: "fun-asr-realtime",
-    note: "The rep's turn can be routed through Qwen rather than the Web Speech API. The browser path is the default because it cannot fail on venue wifi.",
+    model: "Browser dictation or Qwen ASR",
+    note: "The rep's turn can be routed through a server model rather than the Web Speech API. The browser path is the default because it cannot fail on venue wifi.",
     surface: "Websocket",
   },
 ];

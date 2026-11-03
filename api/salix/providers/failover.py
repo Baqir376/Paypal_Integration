@@ -6,8 +6,12 @@ and its coaching plan. So reasoning runs through an ordered list of routes: othe
 models on the same key, then optionally another provider entirely. Different models
 have different capacity, and a different vendor has a different outage.
 
-A route that fails is rested briefly, so the next request does not spend its time
-retrying something already known to be down. If everything fails the error still
+A route gets a limited time to answer before the next one is tried, because an
+overloaded model can take most of a minute just to say so, and meanwhile a sibling would
+have answered in a second. Only the last route left may use the client's full timeout.
+
+A route that fails is rested, so the next request does not spend its time retrying
+something already known to be down. If everything fails the error still
 surfaces, and the pipeline degrades as it always has. It never falls back to the
 offline twin: made-up analysis presented as real is worse than an honest failure.
 
@@ -17,6 +21,7 @@ speaking, and a second voice taking over mid-sentence would be nonsense.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
@@ -29,7 +34,13 @@ from .dashscope_llm import DashScopeLLM
 log = logging.getLogger("salix.llm.failover")
 
 #: How long a route that just failed is passed over, in seconds.
-REST_S = 45.0
+REST_S = 120.0
+#: A request asking for this few tokens is a quick question, so a slow answer means trouble.
+QUICK_TOKENS = 1000
+#: Seconds a route has to answer a quick question, or to start streaming.
+QUICK_PATIENCE_S = 12.0
+#: Seconds a route has to answer anything longer. Long calls take real time to read.
+LONG_PATIENCE_S = 45.0
 
 
 @dataclass
@@ -62,6 +73,9 @@ def build_routes(settings: Settings) -> list[Route]:
     if settings.llm_backup_base_url and settings.llm_backup_api_key:
         for model in settings.llm_backup_list:
             add(settings.llm_backup_base_url, settings.llm_backup_api_key, model, settings.llm_backup_max_tokens)
+    if len(routes) > 1:
+        # Same reasoning as above: with a route behind it, the primary should not retry either.
+        routes[0].llm.settings = settings.model_copy(update={"max_retries": 1})
     return routes
 
 
@@ -82,11 +96,19 @@ class FailoverLLM:
 
     async def _first_answer(self, method: str, model: Optional[str], **kwargs: Any) -> Any:
         last: Optional[Exception] = None
-        for route in self._order():
+        order = self._order()
+        tokens = kwargs.get("max_tokens")
+        patience = QUICK_PATIENCE_S if tokens is not None and tokens <= QUICK_TOKENS else LONG_PATIENCE_S
+        for route in order:
             try:
                 # A caller's explicit model only means something on the primary.
                 chosen = model if route is self.routes[0] else None
-                return await getattr(route.llm, method)(model=chosen, **kwargs)
+                call = getattr(route.llm, method)(model=chosen, **kwargs)
+                # Nothing is waiting behind the last route, so it may take its time.
+                return await (call if route is order[-1] else asyncio.wait_for(call, patience))
+            except TimeoutError as exc:
+                last = exc
+                self._failed(route, ProviderError(route.label, f"no answer within {patience:.0f}s", retryable=True))
             except Exception as exc:  # noqa: BLE001
                 last = exc
                 self._failed(route, exc)
@@ -102,14 +124,29 @@ class FailoverLLM:
 
     async def stream(self, *, model: Optional[str] = None, **kwargs: Any) -> AsyncIterator[str]:
         last: Optional[Exception] = None
-        for route in self._order():
+        order = self._order()
+        for route in order:
             started = False
             try:
                 chosen = model if route is self.routes[0] else None
-                async for token in route.llm.stream(model=chosen, **kwargs):
-                    started = True
+                tokens = route.llm.stream(model=chosen, **kwargs).__aiter__()
+                # Only the first token is timed: once the buyer is speaking, a slow
+                # sentence is still better than a second voice taking over.
+                first = tokens.__anext__()
+                try:
+                    token = await (first if route is order[-1] else asyncio.wait_for(first, QUICK_PATIENCE_S))
+                except StopAsyncIteration:
+                    return
+                started = True
+                yield token
+                async for token in tokens:
                     yield token
                 return
+            except TimeoutError as exc:
+                if started:
+                    raise
+                last = exc
+                self._failed(route, ProviderError(route.label, f"no first token within {QUICK_PATIENCE_S:.0f}s", retryable=True))
             except Exception as exc:  # noqa: BLE001
                 if started:
                     raise

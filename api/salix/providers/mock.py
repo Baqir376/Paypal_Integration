@@ -33,7 +33,7 @@ from .base import ASRResult, ASRSentence
 
 log = logging.getLogger("salix.providers.mock")
 
-_PLACEHOLDER = "Generated in offline mode -- connect a Qwen API key for real analysis."
+_PLACEHOLDER = "Generated in offline mode -- connect an AI provider key for real analysis."
 
 
 def _numeric_bounds(field: FieldInfo) -> tuple[float | None, float | None]:
@@ -746,7 +746,7 @@ class MockLLM:
                 f"Offline reading of a {len(lines)}-turn conversation. "
                 f"{len(objections)} objection(s) detected, "
                 f"{len([o for o in objections if o.handled])} engaged with. "
-                "Connect a Qwen API key for genuine reasoning."
+                "Connect an AI provider key for genuine reasoning."
             ),
             headline=headline,
             stages=stages,
