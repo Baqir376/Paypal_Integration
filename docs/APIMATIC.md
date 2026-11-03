@@ -10,14 +10,17 @@ from PayPal's API definition. The only file that imports it is
 
 ### It has run against PayPal's real sandbox
 
-On 2026-11-03 a real purchase went through this code, with PayPal sandbox keys:
+On 2026-11-03 two real purchases went through this code, with PayPal sandbox keys. This
+is the one recorded in the demo video:
 
 | Step | Evidence |
 | :-- | :-- |
-| `orders.create_order` in `paypal.py` | Order `9H555343TH507360E`, returned with a `payer-action` link to `sandbox.paypal.com` |
+| `orders.create_order` in `paypal.py` | Order `4GM35893VB994222R`, returned with a `payer-action` link to `sandbox.paypal.com` |
 | A sandbox buyer approved it on PayPal's own page | Returned to `/billing/return` |
-| `orders.capture_order` in `paypal.py` | Capture `9YY25602CS4125354`, USD 40.00, `COMPLETED`, read back from PayPal's API |
+| `orders.capture_order` in `paypal.py` | Capture `4M2861976M379154E`, USD 40.00, `COMPLETED`, read back from PayPal's API |
 | Salix's ledger | 25 credits granted, once |
+
+The earlier order was `9H555343TH507360E`, captured as `9YY25602CS4125354`, also USD 40.00.
 
 Sandbox only: no real money moved. To check it yourself with your own sandbox keys,
 follow the Quickstart, set `SALIX_PAYPAL_CLIENT_ID` and `SALIX_PAYPAL_CLIENT_SECRET`, and

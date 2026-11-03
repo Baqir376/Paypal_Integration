@@ -28,6 +28,7 @@ from typing import AsyncIterator, Optional
 
 from ..metrics.engine import compute_metrics, is_question, split_sentences
 from ..metrics.scorecard import build_scorecard
+from ..providers.base import ProviderError
 from ..providers.base import Providers
 from ..schemas.call import Segment, Transcript
 from ..schemas.common import SkillAxis, SpeakerRole
@@ -183,6 +184,11 @@ class DojoEngine:
             for turn in session.turns
         ]
 
+        # A buyer speaks, so markdown is never part of the line. Nothing goes out until
+        # there is a real word: under load a fallback model has answered "**: * *", which
+        # the rep would otherwise read and hear as the buyer's reply.
+        speaking = False
+        held = ""
         async for token in self.providers.llm.stream(
             system=persona_system_prompt(session.persona, session.language, session.brief),
             user=rep_text,
@@ -190,7 +196,17 @@ class DojoEngine:
             temperature=0.75,  # a person, not a template
             max_tokens=220,
         ):
-            yield token
+            clean = token.replace("*", "").replace("#", "")
+            if speaking:
+                if clean:
+                    yield clean
+                continue
+            held += clean
+            if any(character.isalpha() for character in held):
+                speaking = True
+                yield held.lstrip(" :-\n\t")
+        if not speaking:
+            raise ProviderError(self.providers.llm.name, "the model returned no words", retryable=True)
 
     def record_turn(
         self,

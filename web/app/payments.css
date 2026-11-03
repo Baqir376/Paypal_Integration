@@ -164,16 +164,14 @@
   margin-bottom: 24px;
   padding: 28px 30px;
   border-radius: 26px;
-  background: color-mix(in srgb, var(--paper-2) 68%, transparent);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: color-mix(in srgb, var(--paper-2) 76%, transparent);
   box-shadow: inset 0 0 0 1px var(--rule), 0 30px 70px -44px rgb(0 0 0 / 0.55);
 }
 .credit-hero-glow { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
 .credit-hero-glow::before,
-.credit-hero-glow::after { content: ""; position: absolute; border-radius: 50%; filter: blur(60px); }
-.credit-hero-glow::before { width: 360px; height: 360px; top: -190px; right: 8%; background: #d4f55a; opacity: 0.34; animation: glow-drift 10s ease-in-out infinite alternate; }
-.credit-hero-glow::after { width: 280px; height: 280px; bottom: -190px; left: 22%; background: #7ddcd2; opacity: 0.24; animation: glow-drift 13s ease-in-out infinite alternate-reverse; }
+.credit-hero-glow::after { content: ""; position: absolute; border-radius: 50%; will-change: transform; }
+.credit-hero-glow::before { width: 560px; height: 560px; top: -290px; right: 4%; background: radial-gradient(closest-side, #d4f55a, transparent); opacity: 0.34; animation: glow-drift 10s ease-in-out infinite alternate; }
+.credit-hero-glow::after { width: 460px; height: 460px; bottom: -280px; left: 18%; background: radial-gradient(closest-side, #7ddcd2, transparent); opacity: 0.24; animation: glow-drift 13s ease-in-out infinite alternate-reverse; }
 .credit-hero-main { position: relative; min-width: 0; }
 .credit-hero-number { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 13px; margin: 2px 0 0; font-family: var(--font-display); font-size: 30px; font-weight: 400; line-height: 1; color: var(--ink-2); }
 .credit-hero-number .num { font-family: var(--font-display); font-size: clamp(64px, 11vw, 96px); line-height: 1; color: var(--ink); letter-spacing: -0.02em; }
@@ -217,6 +215,7 @@
   animation: pack-spin 5s linear infinite;
 }
 @keyframes pack-spin { to { --pack-spin: 360deg; } }
+.pack:not(:hover) .pack-ring { animation-play-state: paused; }
 .pack-best { z-index: 2; animation: best-bob 2.8s ease-in-out infinite; }
 @keyframes best-bob { 50% { translate: 0 -2px; } }
 .pack .eyebrow { display: flex; align-items: center; min-height: 22px; }

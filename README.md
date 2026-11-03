@@ -41,9 +41,10 @@ SALIX_BRAINTREE_PRIVATE_KEY=...
 ```
 
 **PayPal Orders has run for real through the APIMatic SDK, against PayPal's own sandbox.**
-Order `9H555343TH507360E` was created by `paypal-server-sdk`, approved by a sandbox buyer on
-PayPal's page, and captured as `9YY25602CS4125354` for USD 40.00, status `COMPLETED`, read
-back from PayPal's API. Sandbox only, so no real money moved.
+Order `4GM35893VB994222R` was created by `paypal-server-sdk`, approved by a sandbox buyer on
+PayPal's page, and captured as `4M2861976M379154E` for USD 40.00, status `COMPLETED`, read
+back from PayPal's API. That is the payment in the demo video. An earlier order,
+`9H555343TH507360E`, went the same way. Sandbox only, so no real money moved.
 [`docs/APIMATIC.md`](docs/APIMATIC.md) has the evidence and how to check it. A Braintree
 sandbox payment also passed, for builders in countries where PayPal does not open accounts.
 
@@ -72,7 +73,7 @@ python -m venv .venv
 **2 — Run the test suite.** Still in `api/`:
 
 ```bash
-.venv/Scripts/python -m pytest -q     # 1440 passed, 10 skipped
+.venv/Scripts/python -m pytest -q     # 1444 passed, 10 skipped
 ```
 
 Everything below assumes `.venv/Scripts/python` on Windows; on macOS and Linux
@@ -534,7 +535,7 @@ api/
     routers/      HTTP surface
   scripts/
     gen_types.py  compiles the Pydantic contract into web/lib/types.ts
-  tests/          1450 tests
+  tests/          1454 tests
 seed/             the corpus: cast, scripts, and the build pipeline
 web/
   app/            index, archive, console, calls, reps, playbook, deals,
@@ -582,7 +583,7 @@ cd web && npx tsc --noEmit
 - **Repair loops.** Structured output that fails validation is returned to the
   model *with the validator's complaint*; citations that name nonexistent
   segments are returned with the list of legal ids.
-- **Typed end to end**, and 1450 tests covering the metrics engine against
+- **Typed end to end**, and 1454 tests covering the metrics engine against
   hand-computed fixtures, Urdu and Roman Urdu question and backchannel
   detection, vector search, persistence round-trips, the full DAG, and every
   HTTP endpoint against a really-seeded database.
