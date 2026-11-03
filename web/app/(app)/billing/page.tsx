@@ -102,8 +102,10 @@ function BillingPage() {
       dropIn.current = null;
       const [{ client_token }, library] = await Promise.all([api.braintreeToken(), loadDropIn()]);
       setPaying(packId);
-      // After the box below has rendered.
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      // The box below renders with this state, which can take more than a frame.
+      for (let frame = 0; !dropInBox.current && frame < 120; frame++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
       dropIn.current = await library.create({
         authorization: client_token,
         container: dropInBox.current,

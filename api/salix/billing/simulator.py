@@ -18,6 +18,7 @@ The pages say "simulated" wherever a person could otherwise believe they paid.
 from __future__ import annotations
 
 import json
+import uuid
 import re
 from io import BytesIO
 from typing import Any
@@ -92,7 +93,8 @@ class SimulatedPayPal(HTTPAdapter):
             )
 
         if path == "/v2/checkout/orders" and request.method == "POST":
-            order_id = f"SIM{len(self.orders) + 1:06d}"
+            # Unique across restarts, because the database outlives this dictionary.
+            order_id = f"SIM{uuid.uuid4().hex[:12].upper()}"
             self.orders[order_id] = {
                 "id": order_id,
                 "status": "PAYER_ACTION_REQUIRED",

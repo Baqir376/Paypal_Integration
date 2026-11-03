@@ -276,32 +276,52 @@ export function subscribeToPipeline(
   onEvent: (event: PipelineEvent) => void,
   onDone?: () => void,
 ): () => void {
-  const source = new EventSource(`/api/calls/${callId}/events`);
+  let source: EventSource;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let retries = 0;
+  let over = false;
 
-  source.onmessage = (message) => {
-    try {
-      const event = JSON.parse(message.data) as PipelineEvent;
-      onEvent(event);
-      if (event.stage === "done") {
-        source.close();
-        onDone?.();
-      }
-    } catch {
-      /* a malformed frame should never take down the stream */
-    }
-  };
-
-  source.addEventListener("close", () => {
+  const finish = () => {
+    over = true;
     source.close();
     onDone?.();
-  });
-
-  source.onerror = () => {
-    // EventSource retries on its own; only give up once it has closed.
-    if (source.readyState === EventSource.CLOSED) onDone?.();
   };
 
-  return () => source.close();
+  // The stream can end before the run does. The server replays what happened
+  // on connect, so reconnecting is safe, and only "done" means it finished.
+  const reconnect = () => {
+    source.close();
+    if (over) return;
+    if (retries++ >= 30) return finish();
+    retry = setTimeout(open, 2000);
+  };
+
+  function open() {
+    source = new EventSource(`/api/calls/${callId}/events`);
+    source.onmessage = (message) => {
+      try {
+        const event = JSON.parse(message.data) as PipelineEvent;
+        retries = 0;
+        onEvent(event);
+        if (event.stage === "done") finish();
+      } catch {
+        /* a malformed frame should never take down the stream */
+      }
+    };
+    source.addEventListener("close", reconnect);
+    source.onerror = () => {
+      // EventSource retries on its own; only step in once it has closed.
+      if (source.readyState === EventSource.CLOSED) reconnect();
+    };
+  }
+
+  open();
+
+  return () => {
+    over = true;
+    clearTimeout(retry);
+    source.close();
+  };
 }
 
 /**

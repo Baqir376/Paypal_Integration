@@ -82,9 +82,9 @@ async def lifespan(app: FastAPI):
             "anyone who can reach this port. Fine on a laptop; set a key "
             "before binding to anything else."
         )
-    if settings.billing_enforced and not settings.paypal_configured:
+    if settings.billing_enforced and not settings.payment_provider:
         log.warning(
-            "SALIX_BILLING_MODE charges for uploads but PayPal is not configured: "
+            "SALIX_BILLING_MODE charges for uploads but no payment provider is configured: "
             "nobody can buy a credit, so nobody can upload."
         )
     elif settings.paypal_simulated:

@@ -31,6 +31,8 @@ log = logging.getLogger("salix.routers.calls")
 
 router = APIRouter(prefix="/calls", tags=["calls"])
 
+STREAM_KEEPALIVE_S = 15.0
+
 # Audio formats Model Studio accepts for file transcription.
 ALLOWED_SUFFIXES = {
     ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma",
@@ -340,6 +342,37 @@ async def _ensure_owned(request: Request, call_id: str) -> None:
     owned(call, request.state.auth.org_id, "call", call_id)
 
 
+async def _pipeline_frames(call_id: str):
+    """The SSE frames for one run, with a heartbeat while a stage is quiet.
+
+    The wait must not cancel the pending read: cancelling it ends the
+    subscription's generator, so the first quiet stretch would close the stream
+    and the browser would announce a finish while the analysis was still going.
+    """
+    subscription = bus.subscribe(call_id)
+    pending: asyncio.Future | None = None
+    try:
+        while True:
+            if pending is None:
+                pending = asyncio.ensure_future(subscription.__anext__())
+            finished, _ = await asyncio.wait({pending}, timeout=STREAM_KEEPALIVE_S)
+            if not finished:
+                yield ": keepalive\n\n"
+                continue
+            read, pending = pending, None
+            try:
+                event = read.result()
+            except StopAsyncIteration:
+                break
+            yield f"data: {json.dumps(event.model_dump(mode='json'))}\n\n"
+    except asyncio.CancelledError:  # client navigated away
+        raise
+    finally:
+        if pending is not None:
+            pending.cancel()
+        yield "event: close\ndata: {}\n\n"
+
+
 @router.get("/{call_id}/events")
 async def stream_events(request: Request, call_id: str) -> StreamingResponse:
     """Server-sent events for one call's pipeline run.
@@ -349,27 +382,8 @@ async def stream_events(request: Request, call_id: str) -> StreamingResponse:
     """
     await _ensure_owned(request, call_id)
 
-    async def generate():
-        try:
-            subscription = bus.subscribe(call_id)
-            while True:
-                try:
-                    event = await asyncio.wait_for(
-                        subscription.__anext__(), timeout=15.0
-                    )
-                except asyncio.TimeoutError:
-                    yield ": keepalive\n\n"
-                    continue
-                except StopAsyncIteration:
-                    break
-                yield f"data: {json.dumps(event.model_dump(mode='json'))}\n\n"
-        except asyncio.CancelledError:  # client navigated away
-            raise
-        finally:
-            yield "event: close\ndata: {}\n\n"
-
     return StreamingResponse(
-        generate(),
+        _pipeline_frames(call_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",

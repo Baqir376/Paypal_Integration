@@ -142,7 +142,7 @@ but to say something true.
 And the backend:
 
 ```bash
-cd api && .venv/Scripts/python -m pytest -q     # 1438 tests
+cd api && .venv/Scripts/python -m pytest -q     # 1439 tests
 ```
 
 ---

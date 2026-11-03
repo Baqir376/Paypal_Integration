@@ -459,7 +459,11 @@ export default function UploadPage() {
               <IconCheck size={20} style={{ color: "var(--willow)" }} />
               <div style={{ flex: 1, minWidth: 220 }}>
                 <div style={{ fontSize: 15, fontWeight: 500 }}>
-                  {degraded.length ? "Finished, with gaps" : "Analysis complete"}
+                  {!done
+                    ? "Lost the live view. The analysis keeps running, so the call will fill in shortly."
+                    : degraded.length
+                      ? "Finished, with gaps"
+                      : "Analysis complete"}
                 </div>
                 {done?.detail && (
                   <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>

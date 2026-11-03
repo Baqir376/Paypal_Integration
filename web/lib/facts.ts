@@ -17,7 +17,7 @@
  */
 
 /** Backend tests collected by `pytest --collect-only`. */
-export const TEST_COUNT = 1438;
+export const TEST_COUNT = 1439;
 
 /** Metric fixtures computed by hand and asserted against the engine. */
 export const HAND_COMPUTED_FIXTURES = 45;
