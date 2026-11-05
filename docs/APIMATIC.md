@@ -34,7 +34,7 @@ grep -n "paypalserversdk" api/salix/billing/paypal.py
 
 ## 2. The Context Plugin
 
-The ContextMatic plugin was installed in Claude Code and used to review that file
+The ContextMatic plugin was installed in an AI coding assistant and used to review that file
 against the current SDK, through `/integrate-context-matic`, on 2026-11-02. The
 integration was already written by then, so this was a review and not the original
 build.
