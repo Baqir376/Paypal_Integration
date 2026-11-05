@@ -14,6 +14,8 @@ where it did.
 
 ## PayPal AI Hackathon
 
+**Demo video (under 3 minutes):** https://youtu.be/4cAB_pPqYXo
+
 **What is new since the submission period opened:** the credit paywall (PayPal Orders
 through the APIMatic-generated SDK, and Braintree), Google or email sign-in with isolated teams,
 automatic language detection, the deal score and coaching threshold, the closing test
