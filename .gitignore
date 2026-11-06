@@ -56,3 +56,6 @@ web/shots/
 # Database snapshots taken during development.
 salix.db.demo-backup
 *.db-backup
+
+# Local AI assistant settings
+.claude/
